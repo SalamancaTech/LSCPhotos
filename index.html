@@ -10,14 +10,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&family=Bangers&display=swap" rel="stylesheet">
-    
+
     <style>
         body {
             font-family: 'Inter', sans-serif;
             background-color: #0f172a; /* Slate 900 */
             color: #e2e8f0; /* Slate 200 */
         }
-        
+
         .font-mono {
             font-family: 'JetBrains Mono', monospace;
         }
@@ -33,14 +33,14 @@
             height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #1e293b; 
+            background: #1e293b;
         }
         ::-webkit-scrollbar-thumb {
-            background: #475569; 
+            background: #475569;
             border-radius: 4px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #64748b; 
+            background: #64748b;
         }
 
         /* Loading Animation */
@@ -63,7 +63,7 @@
             color: #94a3b8; /* slate-400 */
         }
         .mode-tab.active {
-            border-bottom-width: 2px; 
+            border-bottom-width: 2px;
             font-weight: 700;
         }
 
@@ -71,9 +71,63 @@
         .cursor-pen {
             cursor: crosshair;
         }
+
+        .bg-valid-key {
+            background: linear-gradient(to bottom right, #0f172a, #312e81, #0f172a) !important;
+            background-size: 200% 200%;
+            animation: gradientMove 15s ease infinite;
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- ==================== SETTINGS MODAL ==================== -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl relative">
+            <button onclick="toggleSettingsModal()" class="absolute top-4 right-4 text-slate-500 hover:text-white">
+                <i class="fa-solid fa-times text-xl"></i>
+            </button>
+
+            <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-slate-400"></i> Settings
+            </h2>
+
+            <!-- API Key Section -->
+            <div class="mb-6">
+                <label class="block text-xs font-mono text-slate-500 mb-2 uppercase">Google AI Studio API Key</label>
+                <div class="relative mb-3">
+                    <input type="password" id="settings-apikey" class="w-full bg-slate-800 border border-slate-600 rounded-lg pl-4 pr-12 py-3 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all placeholder-slate-600 font-mono text-sm" placeholder="Paste API Key here...">
+                    <button onclick="toggleApiKeyVisibility()" class="absolute right-3 top-3 text-slate-500 hover:text-white">
+                        <i class="fa-solid fa-eye" id="apikey-visibility-icon"></i>
+                    </button>
+                </div>
+
+                <div class="flex gap-3 mb-4">
+                    <button onclick="submitSettingsApiKey()" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded-lg transition-colors text-sm">
+                        Save Key
+                    </button>
+                    <button onclick="clearSettingsApiKey()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold px-4 py-2 rounded-lg transition-colors text-sm">
+                        Clear
+                    </button>
+                </div>
+
+                <!-- Persistence Toggle -->
+                <label class="flex items-center gap-3 cursor-pointer group">
+                    <div class="relative">
+                        <input type="checkbox" id="persist-apikey-toggle" class="sr-only peer" checked>
+                        <div class="w-10 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                    </div>
+                    <span class="text-sm text-slate-400 group-hover:text-slate-300 transition-colors">Save to Local Storage</span>
+                </label>
+            </div>
+        </div>
+    </div>
 
     <!-- ==================== LOGIN GATE ==================== -->
     <div id="login-overlay" class="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center p-6 transition-opacity duration-500">
@@ -101,7 +155,7 @@
 
     <!-- ==================== MAIN APP ==================== -->
     <div id="app-container" class="hidden-app w-full max-w-7xl flex flex-col gap-6 fade-in pb-20">
-        
+
         <!-- Header -->
         <header class="border-b border-slate-700 pb-0">
             <div class="flex justify-between items-center mb-4">
@@ -114,9 +168,14 @@
                         <span class="text-xs text-slate-400 font-mono">v2.4 // COMPOSITE PIPELINE</span>
                     </div>
                 </div>
-                <button onclick="resetApp()" class="text-slate-400 hover:text-white transition-colors">
-                    <i class="fa-solid fa-rotate-right"></i> Reset
-                </button>
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleSettingsModal()" class="text-slate-400 hover:text-white transition-colors">
+                        <i class="fa-solid fa-gear"></i> Settings
+                    </button>
+                    <button onclick="resetApp()" class="text-slate-400 hover:text-white transition-colors">
+                        <i class="fa-solid fa-rotate-right"></i> Reset
+                    </button>
+                </div>
             </div>
 
             <!-- MODE TABS -->
@@ -134,17 +193,17 @@
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
+
             <!-- LEFT COLUMN: CONTROLS -->
             <div class="lg:col-span-5 space-y-6">
-                
+
                 <!-- 1. SHARED: THE GREEN ROOM (Uploads) -->
                 <section class="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider"><i class="fa-solid fa-users mr-2"></i>Cast & Characters</h3>
                         <span id="image-count" class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">0 loaded</span>
                     </div>
-                    
+
                     <div class="grid grid-cols-2 gap-4 mb-4" id="preview-grid">
                         <!-- Characters will be injected here with inputs -->
                         <label class="aspect-square bg-slate-700/50 hover:bg-slate-700 border-2 border-dashed border-slate-600 hover:border-slate-400 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all group min-h-[140px]">
@@ -199,7 +258,7 @@
                 <!-- 2C. MODE: COMIC BOOK -->
                 <section id="panel-comic" class="hidden bg-slate-800/50 border border-slate-700 rounded-xl p-5 relative overflow-hidden">
                     <div class="absolute -right-4 -top-4 text-slate-700/20 text-9xl"><i class="fa-solid fa-book-open"></i></div>
-                    
+
                     <div class="flex items-center gap-2 mb-4 relative z-10">
                         <span class="w-2 h-2 rounded-full bg-purple-500"></span>
                         <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Comic Editor</h3>
@@ -222,10 +281,10 @@
 
             <!-- RIGHT COLUMN: DARKROOM & EDITOR -->
             <div class="lg:col-span-7 flex flex-col gap-4">
-                
+
                 <!-- Main Canvas Area -->
                 <section class="relative bg-slate-900 border-2 border-slate-700 border-dashed rounded-xl flex items-center justify-center overflow-hidden min-h-[600px] group">
-                    
+
                     <!-- Placeholder State -->
                     <div id="output-placeholder" class="text-center text-slate-600">
                         <i class="fa-solid fa-image text-6xl mb-4 opacity-50"></i>
@@ -250,7 +309,7 @@
                     <!-- View Mode (Static Image) -->
                     <div id="view-mode" class="hidden w-full h-full flex items-center justify-center p-2 relative">
                         <img id="final-image" class="max-w-full max-h-full object-contain shadow-2xl">
-                        
+
                         <!-- Hover Actions -->
                         <div class="absolute bottom-4 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                             <button onclick="startEditing()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg font-bold text-sm flex items-center gap-2">
@@ -304,17 +363,17 @@
 
     <script>
         // ================= CONFIGURATION =================
-        const DAILY_PASSWORD = "LSC"; 
-        
+        const DAILY_PASSWORD = "LSC";
+
         // System State
         let uploadedImages = []; // { id, base64, description }
-        let sessionGallery = []; 
-        let currentImage = null; 
-        let userApiKey = ""; 
-        let currentMode = "composition"; 
+        let sessionGallery = [];
+        let currentImage = null;
+        let userApiKey = "";
+        let currentMode = "composition";
         let isDrawing = false;
-        let ctx = null; 
-        let lastX = 0; 
+        let ctx = null;
+        let lastX = 0;
         let lastY = 0;
 
         // Mode-Specific State
@@ -350,7 +409,7 @@
             { id: "single-wide", label: "Wide Cinematic", panels: 1, type: 'single', prompt: "A single wide-aspect cinematic shot." },
             { id: "retro-print", label: "Retro Print", panels: 1, type: 'single', prompt: "A single square photo." }
         ];
-        const BOOTH_MOODS = JSON.parse(JSON.stringify(COMP_MOODS)); 
+        const BOOTH_MOODS = JSON.parse(JSON.stringify(COMP_MOODS));
 
         const COMIC_LAYOUTS = [
             { id: "strip-3", label: "3-Panel Strip", panels: 3, type: 'strip', prompt: "A horizontal comic strip." },
@@ -386,7 +445,7 @@
             const activeTab = document.getElementById(`tab-${mode}`);
             activeTab.classList.remove('text-slate-400', 'border-transparent');
             activeTab.classList.add('active');
-            
+
             ['composition', 'photobooth', 'comic'].forEach(m => document.getElementById(`panel-${m}`).classList.add('hidden'));
             document.getElementById(`panel-${mode}`).classList.remove('hidden');
 
@@ -417,7 +476,7 @@
 
         function initControls() {
             renderGrid(COMP_SCENES, 'comp-preset-grid', 'composition', 'scene');
-            renderGrid(COMP_MOODS, 'comp-mood-grid', 'composition', 'mood', true); 
+            renderGrid(COMP_MOODS, 'comp-mood-grid', 'composition', 'mood', true);
             renderGrid(BOOTH_FORMATS, 'booth-preset-grid', 'photobooth', 'format');
             renderGrid(BOOTH_MOODS, 'booth-mood-grid', 'photobooth', 'mood', true);
             renderGrid(COMIC_LAYOUTS, 'comic-layout-grid', 'comic', 'layout');
@@ -427,7 +486,7 @@
         function renderGrid(data, elementId, mode, type, isChip = false) {
             const container = document.getElementById(elementId);
             container.innerHTML = '';
-            
+
             data.forEach(item => {
                 const btn = document.createElement('button');
                 let activeColor = 'yellow-400';
@@ -465,7 +524,7 @@
                 let containerId = "";
                 if (mode === 'comic') containerId = type === 'layout' ? 'comic-layout-grid' : 'comic-style-grid';
                 else containerId = isChip ? `${mode === 'composition' ? 'comp' : 'booth'}-mood-grid` : `${mode === 'composition' ? 'comp' : 'booth'}-preset-grid`;
-                
+
                 const container = document.getElementById(containerId);
                 Array.from(container.children).forEach(b => {
                     b.classList.remove('selected', 'bg-yellow-400', 'bg-pink-500', 'bg-purple-500', 'text-slate-900', 'font-bold', 'ring-2', 'ring-yellow-400', 'ring-pink-500', 'ring-purple-500');
@@ -488,7 +547,7 @@
             }
         }
 
-        function toggleCustomMode(prefix) { 
+        function toggleCustomMode(prefix) {
             const isCustom = document.getElementById(`${prefix}-custom-toggle`).checked;
             const textArea = document.getElementById(`${prefix}-custom-prompt`);
             if (isCustom) textArea.classList.remove('hidden');
@@ -508,7 +567,7 @@
                         let width = img.width;
                         let height = img.height;
                         const maxDim = 1024;
-                        if (width > height) { if (width > maxDim) { height *= maxDim / width; width = maxDim; } } 
+                        if (width > height) { if (width > maxDim) { height *= maxDim / width; width = maxDim; } }
                         else { if (height > maxDim) { width *= maxDim / height; height = maxDim; } }
                         canvas.width = width; canvas.height = height;
                         const ctx = canvas.getContext('2d');
@@ -571,31 +630,31 @@
                 // Determine Pipeline Strategy
                 let tasks = [];
                 let layoutType = 'single';
-                
+
                 // 1. COMPOSITION MODE (Single Shot)
                 if (currentMode === 'composition') {
                     const sceneObj = COMP_SCENES.find(s => s.id === state.composition.scene);
                     const moodObj = COMP_MOODS.find(m => m.id === state.composition.mood);
                     const prompt = buildPrompt('composition', { scene: sceneObj?.prompt, mood: moodObj?.prompt });
                     tasks.push({ prompt });
-                } 
+                }
                 // 2. PHOTO BOOTH MODE (Multi-Shot)
                 else if (currentMode === 'photobooth') {
                     const formatObj = BOOTH_FORMATS.find(f => f.id === state.photobooth.format);
                     const moodObj = BOOTH_MOODS.find(m => m.id === state.photobooth.mood);
                     layoutType = formatObj.type;
-                    
+
                     for(let i=0; i<formatObj.panels; i++) {
                         const randomPose = RANDOM_POSES[Math.floor(Math.random() * RANDOM_POSES.length)];
                         // Force variance in prompt
-                        const prompt = buildPrompt('photobooth', { 
+                        const prompt = buildPrompt('photobooth', {
                             format: "A single photo panel.", // Ask for one panel at a time
-                            mood: moodObj?.prompt, 
-                            variation: `Panel ${i+1} of ${formatObj.panels}. POSE ACTION: ${randomPose}.` 
+                            mood: moodObj?.prompt,
+                            variation: `Panel ${i+1} of ${formatObj.panels}. POSE ACTION: ${randomPose}.`
                         });
                         tasks.push({ prompt });
                     }
-                } 
+                }
                 // 3. COMIC MODE (Multi-Shot)
                 else if (currentMode === 'comic') {
                     const layoutObj = COMIC_LAYOUTS.find(l => l.id === state.comic.layout);
@@ -615,16 +674,16 @@
 
                 // EXECUTE PIPELINE
                 document.getElementById('loading-text').innerText = `DEVELOPING ${tasks.length} FRAMES...`;
-                
+
                 // Parallel Fetch
                 const results = await Promise.all(tasks.map(t => callGemini(t.prompt)));
-                
+
                 // STITCH RESULTS
                 document.getElementById('loading-text').innerText = "ASSEMBLING COMPOSITE...";
                 const finalBase64 = await stitchImages(results, layoutType, tasks.length);
-                
+
                 addToGallery(finalBase64, `Mode: ${currentMode} | ${new Date().toLocaleTimeString()}`);
-                
+
             } catch (err) {
                 console.error(err);
                 showError(err.message || "Connection failed.");
@@ -638,7 +697,7 @@
         // --- HELPER: Prompt Builder ---
         function buildPrompt(mode, data) {
             const identityBlock = `CRITICAL: The visual identity (face, hair, features, clothes) MUST be an EXACT MATCH to the reference images. Character consistency is paramount.`;
-            
+
             let inputDesc = `INPUT: The user has provided ${uploadedImages.length} reference image(s).\n`;
             uploadedImages.forEach((img, i) => {
                 inputDesc += `Ref ${i+1}: ${img.description || `Character ${i+1}`}.\n`;
@@ -659,7 +718,7 @@
         async function callGemini(promptText) {
             const parts = [{ text: promptText }];
             uploadedImages.forEach(img => parts.push({ inlineData: { mimeType: "image/jpeg", data: img.base64 } }));
-            
+
             const payload = {
                 contents: [{ parts }],
                 generationConfig: { responseModalities: ["IMAGE"] },
@@ -673,7 +732,7 @@
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${userApiKey}`;
             const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
             const data = await response.json();
-            
+
             const base64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
             if (!base64) throw new Error("Generation failed for one or more panels.");
             return base64;
@@ -702,7 +761,7 @@
                 function processCanvas() {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    
+
                     // Assume all images are roughly same size (from same model)
                     const baseW = images[0].width;
                     const baseH = images[0].height;
@@ -714,7 +773,7 @@
                         canvas.height = (baseH * count) + (padding * (count + 1));
                         ctx.fillStyle = '#ffffff'; // White paper background
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        
+
                         images.forEach((img, i) => {
                             ctx.drawImage(img, padding, padding + (i * (baseH + padding)), baseW, baseH);
                         });
@@ -743,7 +802,7 @@
 
         // ================= UTILS =================
         // ... (Existing Auth, Error, Gallery, Edit functions kept exactly as is) ...
-        
+
         function addToGallery(base64, prompt) {
             const id = Date.now().toString();
             const timestamp = new Date().toLocaleTimeString();
@@ -814,7 +873,7 @@
             document.getElementById('edit-mode').classList.add('hidden');
             document.getElementById('loading-state').classList.remove('hidden');
             document.getElementById('loading-text').innerText = "APPLYING CORRECTIONS...";
-            
+
              try {
                 const parts = [{ text: `EDIT REQUEST: ${prompt}` }, { inlineData: { mimeType: "image/jpeg", data: base64Input } }];
                 const payload = { contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE"] } };
@@ -832,12 +891,12 @@
             const passInput = document.getElementById('password-input').value;
             const keyInput = document.getElementById('apikey-input').value;
             if (passInput === DAILY_PASSWORD) {
-                userApiKey = keyInput.trim(); 
+                userApiKey = keyInput.trim();
                 document.getElementById('login-overlay').style.opacity = '0';
                 setTimeout(() => {
                     document.getElementById('login-overlay').classList.add('hidden');
                     document.getElementById('app-container').classList.remove('hidden-app');
-                    initControls(); 
+                    initControls();
                 }, 500);
             } else {
                 const box = document.querySelector('#login-overlay > div');
@@ -873,7 +932,7 @@
             document.getElementById('output-placeholder').classList.remove('hidden');
             document.getElementById('edit-mode').classList.add('hidden');
             updateCount();
-            initControls(); 
+            initControls();
             switchMode('composition');
         }
 
@@ -905,7 +964,95 @@
         function stopDrawing() { isDrawing = false; }
         function getCoords(e) { const r = document.getElementById('edit-canvas').getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
 
-        window.onload = () => { document.getElementById('password-input').focus(); };
+        // ================= SETTINGS LOGIC =================
+        function initSettings() {
+            const storedKey = localStorage.getItem('LSC_API_KEY');
+            if (storedKey) {
+                userApiKey = storedKey;
+                document.getElementById('settings-apikey').value = storedKey;
+                document.getElementById('apikey-input').value = storedKey; // Pre-fill login input too
+                updateBackground();
+            }
+        }
+
+        function toggleSettingsModal() {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.toggle('hidden');
+        }
+
+        function toggleApiKeyVisibility() {
+            const input = document.getElementById('settings-apikey');
+            const icon = document.getElementById('apikey-visibility-icon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        function submitSettingsApiKey() {
+            const key = document.getElementById('settings-apikey').value.trim();
+            userApiKey = key;
+            const persist = document.getElementById('persist-apikey-toggle').checked;
+
+            if (persist && key) {
+                localStorage.setItem('LSC_API_KEY', key);
+            } else {
+                localStorage.removeItem('LSC_API_KEY');
+            }
+
+            updateBackground();
+            toggleSettingsModal();
+        }
+
+        function clearSettingsApiKey() {
+            userApiKey = "";
+            document.getElementById('settings-apikey').value = "";
+            localStorage.removeItem('LSC_API_KEY');
+            updateBackground();
+        }
+
+        function updateBackground() {
+            if (userApiKey && userApiKey.length > 0) {
+                document.body.classList.add('bg-valid-key');
+            } else {
+                document.body.classList.remove('bg-valid-key');
+            }
+        }
+
+        // Overwrite the existing attemptLogin
+        attemptLogin = function() {
+            const passInput = document.getElementById('password-input').value;
+            const keyInput = document.getElementById('apikey-input').value.trim();
+
+            if (passInput === DAILY_PASSWORD) {
+                if (keyInput) {
+                    userApiKey = keyInput;
+                    document.getElementById('settings-apikey').value = keyInput;
+                }
+
+                updateBackground();
+
+                document.getElementById('login-overlay').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('login-overlay').classList.add('hidden');
+                    document.getElementById('app-container').classList.remove('hidden-app');
+                    initControls();
+                }, 500);
+            } else {
+                const box = document.querySelector('#login-overlay > div');
+                box.classList.add('animate-pulse');
+                setTimeout(() => box.classList.remove('animate-pulse'), 500);
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        }
+
+        window.onload = () => {
+            initSettings();
+            document.getElementById('password-input').focus();
+        };
 
     </script>
 </body>
