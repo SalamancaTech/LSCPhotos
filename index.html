@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nano Banana Photo Booth</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&family=Bangers&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0; /* Slate 200 */
+        }
+        
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .font-comic {
+            font-family: 'Bangers', cursive;
+            letter-spacing: 0.05em;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+
+        /* Loading Animation */
+        .shutter-flash {
+            animation: flash 2s infinite;
+        }
+        @keyframes flash {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; text-shadow: 0 0 20px #fbbf24; }
+            100% { opacity: 0.5; }
+        }
+
+        .hidden-app {
+            display: none;
+        }
+
+        /* Mode Tabs */
+        .mode-tab {
+            border-bottom: 2px solid transparent;
+            color: #94a3b8; /* slate-400 */
+        }
+        .mode-tab.active {
+            border-bottom-width: 2px; 
+            font-weight: 700;
+        }
+
+        /* Canvas drawing cursor */
+        .cursor-pen {
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- ==================== LOGIN GATE ==================== -->
+    <div id="login-overlay" class="fixed inset-0 bg-slate-950 z-50 flex flex-col items-center justify-center p-6 transition-opacity duration-500">
+        <div class="max-w-md w-full bg-slate-900 border border-slate-700 rounded-2xl p-8 shadow-2xl">
+            <div class="text-center mb-8">
+                <i class="fa-solid fa-camera-retro text-5xl text-yellow-400 mb-4"></i>
+                <h1 class="text-3xl font-bold text-white tracking-tight">STUDIO NANO</h1>
+                <p class="text-slate-400 text-sm mt-2">Authorized Personnel Only</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-mono text-slate-500 mb-1 uppercase">Access Code</label>
+                    <input type="password" id="password-input" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-yellow-400 focus:outline-none transition-all placeholder-slate-600" placeholder="Enter daily password...">
+                </div>
+                <div>
+                    <label class="block text-xs font-mono text-slate-500 mb-1 uppercase">API Key (Gemini)</label>
+                    <input type="password" id="apikey-input" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-yellow-400 focus:outline-none transition-all placeholder-slate-600" placeholder="AI Studio Key (Optional if Env Set)">
+                </div>
+                <button onclick="attemptLogin()" class="w-full bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-bold py-3 rounded-lg transition-colors mt-2">ENTER STUDIO</button>
+                <p id="login-error" class="text-red-400 text-center text-sm font-mono mt-2 hidden">ACCESS DENIED</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MAIN APP ==================== -->
+    <div id="app-container" class="hidden-app w-full max-w-7xl flex flex-col gap-6 fade-in pb-20">
+        
+        <!-- Header -->
+        <header class="border-b border-slate-700 pb-0">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-yellow-400 to-amber-600 rounded-lg flex items-center justify-center text-slate-900 shadow-lg shadow-yellow-500/20">
+                        <i class="fa-solid fa-bolt text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-white leading-none">Nano Booth</h2>
+                        <span class="text-xs text-slate-400 font-mono">v2.4 // COMPOSITE PIPELINE</span>
+                    </div>
+                </div>
+                <button onclick="resetApp()" class="text-slate-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-rotate-right"></i> Reset
+                </button>
+            </div>
+
+            <!-- MODE TABS -->
+            <div class="flex gap-8 mt-6 overflow-x-auto">
+                <button onclick="switchMode('composition')" id="tab-composition" class="mode-tab active pb-3 text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap">
+                    <i class="fa-solid fa-layer-group mr-2"></i>Composition
+                </button>
+                <button onclick="switchMode('photobooth')" id="tab-photobooth" class="mode-tab pb-3 text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap">
+                    <i class="fa-solid fa-camera-retro mr-2"></i>Photo Booth
+                </button>
+                <button onclick="switchMode('comic')" id="tab-comic" class="mode-tab pb-3 text-sm font-bold uppercase tracking-wider transition-colors whitespace-nowrap">
+                    <i class="fa-solid fa-book-open mr-2"></i>Comic Book
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- LEFT COLUMN: CONTROLS -->
+            <div class="lg:col-span-5 space-y-6">
+                
+                <!-- 1. SHARED: THE GREEN ROOM (Uploads) -->
+                <section class="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider"><i class="fa-solid fa-users mr-2"></i>Cast & Characters</h3>
+                        <span id="image-count" class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">0 loaded</span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4" id="preview-grid">
+                        <!-- Characters will be injected here with inputs -->
+                        <label class="aspect-square bg-slate-700/50 hover:bg-slate-700 border-2 border-dashed border-slate-600 hover:border-slate-400 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all group min-h-[140px]">
+                            <i class="fa-solid fa-plus text-slate-400 group-hover:text-white mb-2"></i>
+                            <span class="text-[10px] text-slate-400 uppercase">Add Character</span>
+                            <input type="file" id="file-upload" multiple accept="image/*" class="hidden" onchange="handleFileUpload(event)">
+                        </label>
+                    </div>
+                    <p class="text-xs text-slate-500 italic border-t border-slate-700 pt-3">
+                        <i class="fa-solid fa-circle-info mr-1 text-blue-400"></i>
+                        Inputs are now locked per generation to ensure consistency.
+                    </p>
+                </section>
+
+                <!-- 2A. MODE: BASIC COMPOSITION -->
+                <section id="panel-composition" class="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
+                        <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Composition Director</h3>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mb-6" id="comp-preset-grid"></div>
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Character Mood</h3>
+                    <div class="flex flex-wrap gap-2 mb-4" id="comp-mood-grid"></div>
+                    <div class="mt-4 pt-4 border-t border-slate-700">
+                        <label class="flex items-center gap-2 cursor-pointer mb-2">
+                            <input type="checkbox" id="comp-custom-toggle" class="form-checkbox text-yellow-400 rounded bg-slate-700 border-slate-600" onchange="toggleCustomMode('comp')">
+                            <span class="text-sm text-slate-300">Enable Custom Notes</span>
+                        </label>
+                        <textarea id="comp-custom-prompt" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white h-24 hidden focus:ring-1 focus:ring-yellow-400 outline-none" placeholder="Describe specific poses..."></textarea>
+                    </div>
+                </section>
+
+                <!-- 2B. MODE: PHOTO BOOTH -->
+                <section id="panel-photobooth" class="hidden bg-slate-800/50 border border-slate-700 rounded-xl p-5 relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 text-slate-700/20 text-9xl"><i class="fa-solid fa-camera"></i></div>
+                    <div class="flex items-center gap-2 mb-4 relative z-10">
+                        <span class="w-2 h-2 rounded-full bg-pink-500"></span>
+                        <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Booth Configuration</h3>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mb-6 relative z-10" id="booth-preset-grid"></div>
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 relative z-10">Booth Vibe</h3>
+                    <div class="flex flex-wrap gap-2 mb-4 relative z-10" id="booth-mood-grid"></div>
+                    <div class="mt-4 pt-4 border-t border-slate-700 relative z-10">
+                        <label class="flex items-center gap-2 cursor-pointer mb-2">
+                            <input type="checkbox" id="booth-custom-toggle" class="form-checkbox text-pink-500 rounded bg-slate-700 border-slate-600" onchange="toggleCustomMode('booth')">
+                            <span class="text-sm text-slate-300">Enable Booth Notes</span>
+                        </label>
+                        <textarea id="booth-custom-prompt" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white h-24 hidden focus:ring-1 focus:ring-pink-500 outline-none" placeholder="Describe booth specific antics..."></textarea>
+                    </div>
+                </section>
+
+                <!-- 2C. MODE: COMIC BOOK -->
+                <section id="panel-comic" class="hidden bg-slate-800/50 border border-slate-700 rounded-xl p-5 relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 text-slate-700/20 text-9xl"><i class="fa-solid fa-book-open"></i></div>
+                    
+                    <div class="flex items-center gap-2 mb-4 relative z-10">
+                        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                        <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Comic Editor</h3>
+                    </div>
+                    <h3 class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2 relative z-10">Page Layout</h3>
+                    <div class="grid grid-cols-3 gap-2 mb-4 relative z-10" id="comic-layout-grid"></div>
+                    <h3 class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2 relative z-10">Art Style</h3>
+                    <div class="grid grid-cols-2 gap-2 mb-4 relative z-10" id="comic-style-grid"></div>
+                    <div class="mt-4 pt-4 border-t border-slate-700 relative z-10">
+                        <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Script / Panel Breakdown</label>
+                        <textarea id="comic-script" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm text-white h-32 focus:ring-1 focus:ring-purple-500 outline-none font-mono" placeholder="Panel 1: [Character A] enters the room.&#10;Panel 2: [Character A] sees something shocking.&#10;Panel 3: Close up on [Character A]'s face."></textarea>
+                    </div>
+                </section>
+
+                <!-- ACTION BUTTON -->
+                <button id="generate-btn" onclick="generateImage()" class="w-full bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-300 hover:to-amber-400 text-slate-900 font-bold py-4 rounded-xl shadow-lg shadow-yellow-400/20 transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xl tracking-wide">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> DEVELOP
+                </button>
+            </div>
+
+            <!-- RIGHT COLUMN: DARKROOM & EDITOR -->
+            <div class="lg:col-span-7 flex flex-col gap-4">
+                
+                <!-- Main Canvas Area -->
+                <section class="relative bg-slate-900 border-2 border-slate-700 border-dashed rounded-xl flex items-center justify-center overflow-hidden min-h-[600px] group">
+                    
+                    <!-- Placeholder State -->
+                    <div id="output-placeholder" class="text-center text-slate-600">
+                        <i class="fa-solid fa-image text-6xl mb-4 opacity-50"></i>
+                        <p class="font-mono text-sm">WAITING FOR INPUT_</p>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="loading-state" class="hidden absolute inset-0 bg-slate-900/90 z-20 flex flex-col items-center justify-center">
+                        <div class="w-16 h-16 border-4 border-slate-700 border-t-yellow-400 rounded-full animate-spin mb-6" id="loading-spinner"></div>
+                        <p id="loading-text" class="text-yellow-400 font-mono text-lg shutter-flash">PROCESSING CHEMICALS...</p>
+                        <p id="loading-step" class="text-slate-500 text-xs mt-2">Re-posing subjects...</p>
+                    </div>
+
+                    <!-- Error State -->
+                    <div id="error-state" class="hidden absolute inset-0 bg-slate-900/95 z-30 flex flex-col items-center justify-center p-8 text-center">
+                        <i class="fa-solid fa-triangle-exclamation text-red-500 text-4xl mb-4"></i>
+                        <h3 class="text-white font-bold mb-2">Development Failed</h3>
+                        <p id="error-msg" class="text-slate-400 text-sm font-mono mb-4">Unknown Error</p>
+                        <button onclick="hideError()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-white text-sm">Dismiss</button>
+                    </div>
+
+                    <!-- View Mode (Static Image) -->
+                    <div id="view-mode" class="hidden w-full h-full flex items-center justify-center p-2 relative">
+                        <img id="final-image" class="max-w-full max-h-full object-contain shadow-2xl">
+                        
+                        <!-- Hover Actions -->
+                        <div class="absolute bottom-4 flex gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <button onclick="startEditing()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg font-bold text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-pen-nib"></i> Annotate / Edit
+                            </button>
+                            <button onclick="downloadImage()" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-full shadow-lg font-bold text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-download"></i> Save
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Edit Mode (Canvas) -->
+                    <div id="edit-mode" class="hidden absolute inset-0 bg-slate-900 z-10 flex flex-col">
+                        <div class="h-12 bg-slate-800 border-b border-slate-700 flex items-center justify-between px-4">
+                            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Correction Pen</span>
+                            <div class="flex gap-2">
+                                <button onclick="clearCanvas()" class="text-xs text-slate-400 hover:text-white px-2 py-1"><i class="fa-solid fa-eraser mr-1"></i>Clear Ink</button>
+                                <button onclick="cancelEditing()" class="text-xs text-red-400 hover:text-red-300 px-2 py-1"><i class="fa-solid fa-times mr-1"></i>Cancel</button>
+                            </div>
+                        </div>
+                        <div class="flex-grow relative overflow-hidden flex items-center justify-center bg-slate-900 cursor-pen" id="canvas-container">
+                            <canvas id="edit-canvas"></canvas>
+                        </div>
+                        <div class="p-4 bg-slate-800 border-t border-slate-700 space-y-3">
+                            <div class="flex gap-2">
+                                <input type="text" id="edit-prompt" class="flex-grow bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-blue-500" placeholder="Instructions: 'Fix the hand', 'Add a hat', 'Make it darker'...">
+                                <button onclick="submitEdit()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded font-bold text-sm whitespace-nowrap">
+                                    <i class="fa-solid fa-magic mr-2"></i>Regenerate
+                                </button>
+                            </div>
+                            <p class="text-[10px] text-slate-500"><i class="fa-solid fa-info-circle mr-1"></i>Draw on the image to highlight areas for the AI to fix.</p>
+                        </div>
+                    </div>
+
+                </section>
+
+                <!-- SESSION GALLERY (Lightbox) -->
+                <section class="bg-slate-800/50 border border-slate-700 rounded-xl p-4 overflow-hidden">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex justify-between items-center">
+                        <span>Session Gallery</span>
+                        <span id="gallery-count" class="bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full text-[10px]">0</span>
+                    </h3>
+                    <div class="flex gap-3 overflow-x-auto pb-2" id="gallery-strip">
+                        <div class="text-xs text-slate-600 italic py-4 px-2">Generated images will appear here...</div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================= CONFIGURATION =================
+        const DAILY_PASSWORD = "LSC"; 
+        
+        // System State
+        let uploadedImages = []; // { id, base64, description }
+        let sessionGallery = []; 
+        let currentImage = null; 
+        let userApiKey = ""; 
+        let currentMode = "composition"; 
+        let isDrawing = false;
+        let ctx = null; 
+        let lastX = 0; 
+        let lastY = 0;
+
+        // Mode-Specific State
+        let state = {
+            composition: { scene: "", mood: "" },
+            photobooth: { format: "", mood: "" },
+            comic: { style: "", layout: "" }
+        };
+
+        // --- DATA DEFINITIONS ---
+        const COMP_SCENES = [
+            { id: "studio", label: "Classic Studio", prompt: "A high-end studio portrait with dramatic rim lighting, neutral grey background, crisp 85mm lens focus." },
+            { id: "cyberpunk", label: "Neon City", prompt: "A cinematic shot in a rainy cyberpunk city at night, neon signs reflecting on wet pavement, blue and magenta lighting." },
+            { id: "vintage", label: "1920s Photo", prompt: "A grainy black and white vintage photograph from the 1920s, slightly sepia toned, wearing period-appropriate attire." },
+            { id: "fantasy", label: "RPG Tavern", prompt: "Inside a warm, wooden fantasy tavern, candlelit atmosphere, wearing medieval adventurer gear." },
+            { id: "polaroid", label: "90s Mall", prompt: "A flash photography style shot from a 1990s mall photo booth, bright flat lighting, colorful geometric background." },
+            { id: "office", label: "Corporate", prompt: "Professional corporate environment, glass windows in background, business casual attire." }
+        ];
+
+        const COMP_MOODS = [
+            { id: "happy", label: "Joyful", prompt: "laughing, smiling broadly, hugging, energetic" },
+            { id: "cool", label: "Cool", prompt: "stoic, wearing sunglasses if appropriate, confident posture, arms crossed or in pockets" },
+            { id: "silly", label: "Silly", prompt: "making funny faces, peace signs, sticking tongues out, playful chaos" },
+            { id: "heroic", label: "Heroic", prompt: "looking up towards a horizon, wind in hair, strong stance, determination" },
+            { id: "romantic", label: "Romantic", prompt: "soft expressions, holding hands, gazing at each other, intimate proximity" },
+            { id: "candid", label: "Candid", prompt: "looking away from camera, mid-conversation, natural laughing, unstructured" }
+        ];
+
+        // Formats now have a 'panels' count for composite logic
+        const BOOTH_FORMATS = [
+            { id: "vertical-4", label: "Vertical Strip (4)", panels: 4, type: 'strip', prompt: "A photobooth style photo." },
+            { id: "grid-4", label: "Grid (2x2)", panels: 4, type: 'grid', prompt: "A square photo." },
+            { id: "single-wide", label: "Wide Cinematic", panels: 1, type: 'single', prompt: "A single wide-aspect cinematic shot." },
+            { id: "retro-print", label: "Retro Print", panels: 1, type: 'single', prompt: "A single square photo." }
+        ];
+        const BOOTH_MOODS = JSON.parse(JSON.stringify(COMP_MOODS)); 
+
+        const COMIC_LAYOUTS = [
+            { id: "strip-3", label: "3-Panel Strip", panels: 3, type: 'strip', prompt: "A horizontal comic strip." },
+            { id: "grid-4", label: "4-Panel Grid", panels: 4, type: 'grid', prompt: "A 2x2 comic page grid." },
+            { id: "page-6", label: "6-Panel Page", panels: 6, type: 'grid', prompt: "A comic page." },
+            { id: "splash", label: "Splash Page", panels: 1, type: 'single', prompt: "A full-page comic illustration." }
+        ];
+
+        const COMIC_STYLES = [
+            { id: "manga", label: "Manga (B&W)", prompt: "Japanese manga style, black and white ink, screentones, expressive eyes, dynamic speed lines." },
+            { id: "western-hero", label: "Western Superhero", prompt: "Modern American superhero comic style, bold ink lines, vibrant colors, muscular anatomy, dramatic shading." },
+            { id: "noir", label: "Noir / Sin City", prompt: "High contrast noir graphic novel style, stark black and white with occasional spot color, shadowy atmosphere." },
+            { id: "webtoon", label: "Modern Webtoon", prompt: "Clean digital art style, bright flat colors, vertical scrolling aesthetic, expressive character acting." },
+            { id: "silver-age", label: "Silver Age (Retro)", prompt: "1960s comic style, half-tone dots, four-color printing process look, slightly yellowed paper texture." },
+            { id: "sketchy", label: "Rough Sketch", prompt: "Loose pencil and ink sketch style, artistic, expressive lines, unfinished look." }
+        ];
+
+        // Random Poses for variance
+        const RANDOM_POSES = [
+            "looking directly at camera, smiling", "looking to the left, laughing", "looking to the right, surprised",
+            "making a silly face", "hands on chin, thinking", "waving at camera", "crossing arms, cool pose",
+            "peace sign", "adjusting hair/glasses", "leaning forward intimately", "looking up, dreaming", "winking"
+        ];
+
+        // ================= LOGIC =================
+
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-tab').forEach(t => {
+                t.classList.remove('active', 'text-yellow-400', 'text-pink-500', 'text-purple-500', 'border-yellow-400', 'border-pink-500', 'border-purple-500');
+                t.classList.add('text-slate-400', 'border-transparent');
+            });
+            const activeTab = document.getElementById(`tab-${mode}`);
+            activeTab.classList.remove('text-slate-400', 'border-transparent');
+            activeTab.classList.add('active');
+            
+            ['composition', 'photobooth', 'comic'].forEach(m => document.getElementById(`panel-${m}`).classList.add('hidden'));
+            document.getElementById(`panel-${mode}`).classList.remove('hidden');
+
+            const btn = document.getElementById('generate-btn');
+            const spinner = document.getElementById('loading-spinner');
+            const loadText = document.getElementById('loading-text');
+
+            btn.className = "w-full text-slate-900 font-bold py-4 rounded-xl shadow-lg transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xl tracking-wide";
+            spinner.className = "w-16 h-16 border-4 rounded-full animate-spin mb-6";
+
+            if (mode === 'photobooth') {
+                btn.classList.add('bg-gradient-to-r', 'from-pink-500', 'to-rose-500', 'hover:from-pink-400', 'hover:to-rose-400', 'shadow-pink-500/20');
+                activeTab.classList.add('text-pink-500', 'border-pink-500');
+                spinner.classList.add('border-slate-700', 'border-t-pink-500');
+                loadText.className = "text-pink-500 font-mono text-lg shutter-flash";
+            } else if (mode === 'comic') {
+                btn.classList.add('bg-gradient-to-r', 'from-purple-500', 'to-indigo-500', 'hover:from-purple-400', 'hover:to-indigo-400', 'shadow-purple-500/20');
+                activeTab.classList.add('text-purple-500', 'border-purple-500');
+                spinner.classList.add('border-slate-700', 'border-t-purple-500');
+                loadText.className = "text-purple-500 font-mono text-lg shutter-flash";
+            } else {
+                btn.classList.add('bg-gradient-to-r', 'from-yellow-400', 'to-amber-500', 'hover:from-yellow-300', 'hover:to-amber-400', 'shadow-yellow-400/20');
+                activeTab.classList.add('text-yellow-400', 'border-yellow-400');
+                spinner.classList.add('border-slate-700', 'border-t-yellow-400');
+                loadText.className = "text-yellow-400 font-mono text-lg shutter-flash";
+            }
+        }
+
+        function initControls() {
+            renderGrid(COMP_SCENES, 'comp-preset-grid', 'composition', 'scene');
+            renderGrid(COMP_MOODS, 'comp-mood-grid', 'composition', 'mood', true); 
+            renderGrid(BOOTH_FORMATS, 'booth-preset-grid', 'photobooth', 'format');
+            renderGrid(BOOTH_MOODS, 'booth-mood-grid', 'photobooth', 'mood', true);
+            renderGrid(COMIC_LAYOUTS, 'comic-layout-grid', 'comic', 'layout');
+            renderGrid(COMIC_STYLES, 'comic-style-grid', 'comic', 'style');
+        }
+
+        function renderGrid(data, elementId, mode, type, isChip = false) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            
+            data.forEach(item => {
+                const btn = document.createElement('button');
+                let activeColor = 'yellow-400';
+                let activeRing = 'ring-yellow-400';
+                let hoverBorder = 'hover:border-yellow-400/50';
+                let activeBg = 'bg-yellow-400';
+
+                if (mode === 'photobooth') {
+                    activeColor = 'pink-500'; activeRing = 'ring-pink-500'; hoverBorder = 'hover:border-pink-500/50'; activeBg = 'bg-pink-500';
+                } else if (mode === 'comic') {
+                    activeColor = 'purple-500'; activeRing = 'ring-purple-500'; hoverBorder = 'hover:border-purple-500/50'; activeBg = 'bg-purple-500';
+                }
+
+                if (isChip) {
+                    btn.className = `mood-chip px-3 py-1 rounded-full border border-slate-600 bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition-all ${hoverBorder}`;
+                    btn.innerText = item.label;
+                } else {
+                    btn.className = `p-3 rounded-lg border border-slate-600 bg-slate-800 text-slate-300 text-sm hover:bg-slate-700 transition-all text-left group ${hoverBorder}`;
+                    btn.innerHTML = `<span class="font-bold block group-hover:text-white">${item.label}</span>`;
+                }
+
+                btn.onclick = () => selectItem(mode, type, item.id, btn, isChip, activeBg, activeRing);
+                btn.dataset.id = item.id;
+                container.appendChild(btn);
+            });
+        }
+
+        function selectItem(mode, type, id, btnElement, isChip, activeBg, activeRing) {
+            if (state[mode][type] === id && isChip) {
+                state[mode][type] = "";
+                btnElement.classList.remove('selected', activeBg, 'text-slate-900', 'font-bold');
+                btnElement.classList.add('bg-slate-800', 'text-slate-300');
+            } else {
+                state[mode][type] = id;
+                let containerId = "";
+                if (mode === 'comic') containerId = type === 'layout' ? 'comic-layout-grid' : 'comic-style-grid';
+                else containerId = isChip ? `${mode === 'composition' ? 'comp' : 'booth'}-mood-grid` : `${mode === 'composition' ? 'comp' : 'booth'}-preset-grid`;
+                
+                const container = document.getElementById(containerId);
+                Array.from(container.children).forEach(b => {
+                    b.classList.remove('selected', 'bg-yellow-400', 'bg-pink-500', 'bg-purple-500', 'text-slate-900', 'font-bold', 'ring-2', 'ring-yellow-400', 'ring-pink-500', 'ring-purple-500');
+                    b.classList.add('bg-slate-800', 'text-slate-300');
+                });
+
+                btnElement.classList.remove('bg-slate-800', 'text-slate-300');
+                if (isChip) {
+                    btnElement.classList.add('selected', 'text-slate-900', 'font-bold', activeBg);
+                } else {
+                    btnElement.classList.add('bg-slate-700', 'ring-2', activeRing);
+                }
+            }
+            if (mode !== 'comic') {
+                if (type === 'scene' || type === 'format') {
+                    const prefix = mode === 'composition' ? 'comp' : 'booth';
+                    document.getElementById(`${prefix}-custom-toggle`).checked = false;
+                    toggleCustomMode(mode === 'composition' ? 'comp' : 'booth');
+                }
+            }
+        }
+
+        function toggleCustomMode(prefix) { 
+            const isCustom = document.getElementById(`${prefix}-custom-toggle`).checked;
+            const textArea = document.getElementById(`${prefix}-custom-prompt`);
+            if (isCustom) textArea.classList.remove('hidden');
+            else textArea.classList.add('hidden');
+        }
+
+        // ================= FILE HANDLING =================
+        function handleFileUpload(event) {
+            const files = Array.from(event.target.files);
+            if (!files.length) return;
+            files.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        const maxDim = 1024;
+                        if (width > height) { if (width > maxDim) { height *= maxDim / width; width = maxDim; } } 
+                        else { if (height > maxDim) { width *= maxDim / height; height = maxDim; } }
+                        canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                        addImageToState(dataUrl, dataUrl.split(',')[1]);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+            event.target.value = '';
+        }
+
+        function addImageToState(displayUrl, rawBase64) {
+            const id = Date.now() + Math.random().toString(36).substr(2, 9);
+            uploadedImages.push({ id, base64: rawBase64, description: "" });
+            const grid = document.getElementById('preview-grid');
+            const div = document.createElement('div');
+            div.className = "relative group animate-fade-in flex flex-col gap-2";
+            div.innerHTML = `
+                <div class="relative aspect-square w-full">
+                    <img src="${displayUrl}" class="w-full h-full object-cover rounded-lg border border-slate-600 shadow-sm">
+                    <button onclick="removeImage('${id}', this)" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 z-10"><i class="fa-solid fa-times"></i></button>
+                </div>
+                <input type="text" onchange="updateImageDesc('${id}', this.value)" placeholder="Name/Tag" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-yellow-400 outline-none placeholder-slate-600">
+            `;
+            const uploadBtn = grid.querySelector('label');
+            if(uploadBtn) grid.insertBefore(div, uploadBtn);
+            else grid.appendChild(div);
+            updateCount();
+        }
+
+        function updateImageDesc(id, val) { const img = uploadedImages.find(i => i.id === id); if(img) img.description = val; }
+        function removeImage(id, btn) { uploadedImages = uploadedImages.filter(img => img.id !== id); btn.parentElement.parentElement.remove(); updateCount(); }
+        function updateCount() { document.getElementById('image-count').innerText = `${uploadedImages.length} loaded`; }
+
+        // ================= GENERATION LOGIC (COMPOSITE PIPELINE) =================
+
+        async function generateImage() {
+            if (uploadedImages.length === 0) { showError("Please upload at least one reference image."); return; }
+
+            const prefix = currentMode === 'composition' ? 'comp' : (currentMode === 'photobooth' ? 'booth' : 'comic');
+            let isValid = false;
+            if (currentMode === 'composition') isValid = state.composition.scene || document.getElementById('comp-custom-toggle').checked;
+            else if (currentMode === 'photobooth') isValid = state.photobooth.format || document.getElementById('booth-custom-toggle').checked;
+            else if (currentMode === 'comic') isValid = state.comic.layout && state.comic.style;
+
+            if (!isValid) { showError("Please select a style/format."); return; }
+
+            // UI Prep
+            document.getElementById('loading-state').classList.remove('hidden');
+            document.getElementById('view-mode').classList.add('hidden');
+            document.getElementById('output-placeholder').classList.add('hidden');
+            document.getElementById('edit-mode').classList.add('hidden');
+            document.getElementById('generate-btn').disabled = true;
+            document.getElementById('generate-btn').innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> DEVELOPING...`;
+
+            try {
+                // Determine Pipeline Strategy
+                let tasks = [];
+                let layoutType = 'single';
+                
+                // 1. COMPOSITION MODE (Single Shot)
+                if (currentMode === 'composition') {
+                    const sceneObj = COMP_SCENES.find(s => s.id === state.composition.scene);
+                    const moodObj = COMP_MOODS.find(m => m.id === state.composition.mood);
+                    const prompt = buildPrompt('composition', { scene: sceneObj?.prompt, mood: moodObj?.prompt });
+                    tasks.push({ prompt });
+                } 
+                // 2. PHOTO BOOTH MODE (Multi-Shot)
+                else if (currentMode === 'photobooth') {
+                    const formatObj = BOOTH_FORMATS.find(f => f.id === state.photobooth.format);
+                    const moodObj = BOOTH_MOODS.find(m => m.id === state.photobooth.mood);
+                    layoutType = formatObj.type;
+                    
+                    for(let i=0; i<formatObj.panels; i++) {
+                        const randomPose = RANDOM_POSES[Math.floor(Math.random() * RANDOM_POSES.length)];
+                        // Force variance in prompt
+                        const prompt = buildPrompt('photobooth', { 
+                            format: "A single photo panel.", // Ask for one panel at a time
+                            mood: moodObj?.prompt, 
+                            variation: `Panel ${i+1} of ${formatObj.panels}. POSE ACTION: ${randomPose}.` 
+                        });
+                        tasks.push({ prompt });
+                    }
+                } 
+                // 3. COMIC MODE (Multi-Shot)
+                else if (currentMode === 'comic') {
+                    const layoutObj = COMIC_LAYOUTS.find(l => l.id === state.comic.layout);
+                    const styleObj = COMIC_STYLES.find(s => s.id === state.comic.style);
+                    const scriptLines = document.getElementById('comic-script').value.split('\n').filter(l => l.trim());
+                    layoutType = layoutObj.type;
+
+                    for(let i=0; i<layoutObj.panels; i++) {
+                        const line = scriptLines[i] || `Panel ${i+1} action sequence.`;
+                        const prompt = buildPrompt('comic', {
+                            style: styleObj.prompt,
+                            variation: `Panel ${i+1} of ${layoutObj.panels}. ACTION SCRIPT: ${line}`
+                        });
+                        tasks.push({ prompt });
+                    }
+                }
+
+                // EXECUTE PIPELINE
+                document.getElementById('loading-text').innerText = `DEVELOPING ${tasks.length} FRAMES...`;
+                
+                // Parallel Fetch
+                const results = await Promise.all(tasks.map(t => callGemini(t.prompt)));
+                
+                // STITCH RESULTS
+                document.getElementById('loading-text').innerText = "ASSEMBLING COMPOSITE...";
+                const finalBase64 = await stitchImages(results, layoutType, tasks.length);
+                
+                addToGallery(finalBase64, `Mode: ${currentMode} | ${new Date().toLocaleTimeString()}`);
+                
+            } catch (err) {
+                console.error(err);
+                showError(err.message || "Connection failed.");
+            } finally {
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('generate-btn').disabled = false;
+                document.getElementById('generate-btn').innerHTML = `<i class="fa-solid fa-wand-magic-sparkles mr-2"></i> DEVELOP`;
+            }
+        }
+
+        // --- HELPER: Prompt Builder ---
+        function buildPrompt(mode, data) {
+            const identityBlock = `CRITICAL: The visual identity (face, hair, features, clothes) MUST be an EXACT MATCH to the reference images. Character consistency is paramount.`;
+            
+            let inputDesc = `INPUT: The user has provided ${uploadedImages.length} reference image(s).\n`;
+            uploadedImages.forEach((img, i) => {
+                inputDesc += `Ref ${i+1}: ${img.description || `Character ${i+1}`}.\n`;
+            });
+
+            if (mode === 'composition') {
+                const notes = document.getElementById('comp-custom-prompt').value;
+                return `${inputDesc}\nTASK: Single photorealistic image.\nSCENE: ${data.scene}\nMOOD: ${data.mood}. ${notes}\n${identityBlock}`;
+            } else if (mode === 'photobooth') {
+                const notes = document.getElementById('booth-custom-prompt').value;
+                return `${inputDesc}\nTASK: Generate ONE distinct photo panel.\nSTYLE: Photobooth.\n${data.variation}\nMOOD: ${data.mood}. ${notes}\n${identityBlock}\nEnsure the character is centered and distinct.`;
+            } else if (mode === 'comic') {
+                return `${inputDesc}\nTASK: Generate ONE comic panel.\nSTYLE: ${data.style}\n${data.variation}\n${identityBlock}\nEnsure clear action and consistent drawing style.`;
+            }
+        }
+
+        // --- HELPER: API Call ---
+        async function callGemini(promptText) {
+            const parts = [{ text: promptText }];
+            uploadedImages.forEach(img => parts.push({ inlineData: { mimeType: "image/jpeg", data: img.base64 } }));
+            
+            const payload = {
+                contents: [{ parts }],
+                generationConfig: { responseModalities: ["IMAGE"] },
+                safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+                ]
+            };
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${userApiKey}`;
+            const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+            const data = await response.json();
+            
+            const base64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+            if (!base64) throw new Error("Generation failed for one or more panels.");
+            return base64;
+        }
+
+        // --- HELPER: Image Stitching ---
+        async function stitchImages(base64Array, type, count) {
+            if(type === 'single') return base64Array[0];
+
+            return new Promise((resolve) => {
+                const images = base64Array.map(b64 => {
+                    const img = new Image();
+                    img.src = `data:image/png;base64,${b64}`;
+                    return img;
+                });
+
+                // Wait for all to load
+                let loaded = 0;
+                images.forEach(img => {
+                    img.onload = () => {
+                        loaded++;
+                        if(loaded === count) processCanvas();
+                    }
+                });
+
+                function processCanvas() {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Assume all images are roughly same size (from same model)
+                    const baseW = images[0].width;
+                    const baseH = images[0].height;
+                    const padding = 20;
+
+                    if (type === 'strip') {
+                        // Vertical Strip
+                        canvas.width = baseW + (padding * 2);
+                        canvas.height = (baseH * count) + (padding * (count + 1));
+                        ctx.fillStyle = '#ffffff'; // White paper background
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        images.forEach((img, i) => {
+                            ctx.drawImage(img, padding, padding + (i * (baseH + padding)), baseW, baseH);
+                        });
+                    } else if (type === 'grid') {
+                        // 2xGrid
+                        const cols = 2;
+                        const rows = Math.ceil(count / 2);
+                        canvas.width = (baseW * cols) + (padding * 3);
+                        canvas.height = (baseH * rows) + (padding * 3);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                        images.forEach((img, i) => {
+                            const col = i % 2;
+                            const row = Math.floor(i / 2);
+                            const x = padding + (col * (baseW + padding));
+                            const y = padding + (row * (baseH + padding));
+                            ctx.drawImage(img, x, y, baseW, baseH);
+                        });
+                    }
+
+                    resolve(canvas.toDataURL('image/jpeg').split(',')[1]);
+                }
+            });
+        }
+
+        // ================= UTILS =================
+        // ... (Existing Auth, Error, Gallery, Edit functions kept exactly as is) ...
+        
+        function addToGallery(base64, prompt) {
+            const id = Date.now().toString();
+            const timestamp = new Date().toLocaleTimeString();
+            sessionGallery.unshift({ id, base64, prompt, timestamp });
+            updateGalleryUI();
+            currentImage = { id, base64 };
+            document.getElementById('final-image').src = `data:image/png;base64,${base64}`;
+            document.getElementById('output-placeholder').classList.add('hidden');
+            document.getElementById('view-mode').classList.remove('hidden');
+            document.getElementById('edit-mode').classList.add('hidden');
+        }
+
+        function updateGalleryUI() {
+            const strip = document.getElementById('gallery-strip');
+            const count = document.getElementById('gallery-count');
+            count.innerText = sessionGallery.length;
+            if (sessionGallery.length === 0) {
+                strip.innerHTML = '<div class="text-xs text-slate-600 italic py-4 px-2">Generated images will appear here...</div>';
+                return;
+            }
+            strip.innerHTML = '';
+            sessionGallery.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "flex-shrink-0 w-24 h-24 rounded-lg overflow-hidden border border-slate-700 hover:border-white cursor-pointer transition-all relative group";
+                div.innerHTML = `<img src="data:image/png;base64,${item.base64}" class="w-full h-full object-cover">`;
+                div.onclick = () => loadFromGallery(item.id);
+                strip.appendChild(div);
+            });
+        }
+
+        function loadFromGallery(id) {
+            const item = sessionGallery.find(i => i.id === id);
+            if (!item) return;
+            currentImage = item;
+            document.getElementById('final-image').src = `data:image/png;base64,${item.base64}`;
+            document.getElementById('output-placeholder').classList.add('hidden');
+            document.getElementById('view-mode').classList.remove('hidden');
+            document.getElementById('edit-mode').classList.add('hidden');
+        }
+
+        // Re-adding fetchWithBackoff for edits if needed, although generic flow uses callGemini
+        async function fetchWithBackoff(url, payload, retries = 3) {
+             const delays = [1000, 2000, 4000];
+            for (let i = 0; i <= retries; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.error?.message || `API Error: ${response.status}`);
+                    return data;
+                } catch (error) {
+                    if (i === retries) throw error;
+                    document.getElementById('loading-step').innerText = `Retrying connection... (${i+1}/${retries})`;
+                    await new Promise(r => setTimeout(r, delays[i]));
+                }
+            }
+        }
+
+        // Edit logic needs re-implementation since we moved generic generation to 'callGemini'
+        async function submitEdit() {
+            const prompt = document.getElementById('edit-prompt').value;
+            if(!prompt) { showError("Enter instructions."); return; }
+            const canvas = document.getElementById('edit-canvas');
+            const base64Input = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
+            document.getElementById('edit-mode').classList.add('hidden');
+            document.getElementById('loading-state').classList.remove('hidden');
+            document.getElementById('loading-text').innerText = "APPLYING CORRECTIONS...";
+            
+             try {
+                const parts = [{ text: `EDIT REQUEST: ${prompt}` }, { inlineData: { mimeType: "image/jpeg", data: base64Input } }];
+                const payload = { contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE"] } };
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${userApiKey}`;
+                const data = await fetchWithBackoff(url, payload); // Use fetchWithBackoff for edits
+                const base64 = data.candidates?.[0]?.content?.parts?.find(p=>p.inlineData)?.inlineData?.data;
+                if(!base64) throw new Error("Edit failed");
+                document.getElementById('loading-state').classList.add('hidden');
+                addToGallery(base64, `Edit: ${prompt}`);
+            } catch(e) { showError(e.message); document.getElementById('loading-state').classList.add('hidden'); document.getElementById('view-mode').classList.remove('hidden'); }
+        }
+
+        // Rest of Utils
+        function attemptLogin() {
+            const passInput = document.getElementById('password-input').value;
+            const keyInput = document.getElementById('apikey-input').value;
+            if (passInput === DAILY_PASSWORD) {
+                userApiKey = keyInput.trim(); 
+                document.getElementById('login-overlay').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('login-overlay').classList.add('hidden');
+                    document.getElementById('app-container').classList.remove('hidden-app');
+                    initControls(); 
+                }, 500);
+            } else {
+                const box = document.querySelector('#login-overlay > div');
+                box.classList.add('animate-pulse');
+                setTimeout(() => box.classList.remove('animate-pulse'), 500);
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        }
+        document.getElementById('password-input').addEventListener('keypress', (e) => { if(e.key==='Enter') attemptLogin() });
+
+        function showError(msg) {
+            document.getElementById('error-msg').innerText = msg;
+            document.getElementById('error-state').classList.remove('hidden');
+            document.getElementById('loading-state').classList.add('hidden');
+        }
+        function hideError() { document.getElementById('error-state').classList.add('hidden'); }
+        function downloadImage() {
+            const img = document.getElementById('final-image');
+            if (!img.src) return;
+            const a = document.createElement('a');
+            a.href = img.src;
+            a.download = `nano-booth-${Date.now()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+        function resetApp() {
+            uploadedImages = [];
+            state = { composition: { scene: "", mood: "" }, photobooth: { format: "", mood: "" }, comic: { style: "", layout: "" } };
+            document.getElementById('preview-grid').innerHTML = `<label class="aspect-square bg-slate-700/50 hover:bg-slate-700 border-2 border-dashed border-slate-600 hover:border-slate-400 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all group min-h-[140px]"><i class="fa-solid fa-plus text-slate-400 group-hover:text-white mb-2"></i><span class="text-[10px] text-slate-400 uppercase">Add Character</span><input type="file" id="file-upload" multiple accept="image/*" class="hidden" onchange="handleFileUpload(event)"></label>`;
+            document.getElementById('final-image').src = "";
+            document.getElementById('view-mode').classList.add('hidden');
+            document.getElementById('output-placeholder').classList.remove('hidden');
+            document.getElementById('edit-mode').classList.add('hidden');
+            updateCount();
+            initControls(); 
+            switchMode('composition');
+        }
+
+        // Canvas editing logic
+        function startEditing() {
+            if (!currentImage) return;
+            document.getElementById('view-mode').classList.add('hidden');
+            document.getElementById('edit-mode').classList.remove('hidden');
+            const img = new Image();
+            img.onload = () => {
+                const container = document.getElementById('canvas-container');
+                const canvas = document.getElementById('edit-canvas');
+                const ratio = Math.min(container.clientWidth / img.width, container.clientHeight / img.height);
+                canvas.width = img.width * ratio; canvas.height = img.height * ratio;
+                ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                canvas.onmousedown = startDrawing; canvas.onmousemove = draw; canvas.onmouseup = stopDrawing;
+                // Touch
+                canvas.addEventListener('touchstart', (e) => { const touch = e.touches[0]; const mouseEvent = new MouseEvent('mousedown', { clientX: touch.clientX, clientY: touch.clientY }); canvas.dispatchEvent(mouseEvent); });
+                canvas.addEventListener('touchmove', (e) => { e.preventDefault(); const touch = e.touches[0]; const mouseEvent = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY }); canvas.dispatchEvent(mouseEvent); });
+                canvas.addEventListener('touchend', () => { const mouseEvent = new MouseEvent('mouseup', {}); canvas.dispatchEvent(mouseEvent); });
+            };
+            img.src = `data:image/png;base64,${currentImage.base64}`;
+        }
+        function cancelEditing() { document.getElementById('edit-mode').classList.add('hidden'); document.getElementById('view-mode').classList.remove('hidden'); }
+        function clearCanvas() { if (!currentImage) return; const img = new Image(); img.onload = () => { ctx.clearRect(0,0,ctx.canvas.width, ctx.canvas.height); ctx.drawImage(img, 0, 0, ctx.canvas.width, ctx.canvas.height); }; img.src = `data:image/png;base64,${currentImage.base64}`; }
+        function startDrawing(e) { isDrawing = true; [lastX, lastY] = getCoords(e); }
+        function draw(e) { if(!isDrawing) return; const [x,y]=getCoords(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.strokeStyle='#ef4444'; ctx.lineWidth=5; ctx.stroke(); [lastX, lastY]=[x,y]; }
+        function stopDrawing() { isDrawing = false; }
+        function getCoords(e) { const r = document.getElementById('edit-canvas').getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+
+        window.onload = () => { document.getElementById('password-input').focus(); };
+
+    </script>
+</body>
+</html>
