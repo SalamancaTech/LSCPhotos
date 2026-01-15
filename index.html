@@ -16,6 +16,9 @@
             font-family: 'Inter', sans-serif;
             background-color: #0f172a; /* Slate 900 */
             color: #e2e8f0; /* Slate 200 */
+            position: relative;
+            overflow-x: hidden;
+            transition: background 1s ease; /* Smooth transition between gradients */
         }
 
         .font-mono {
@@ -72,20 +75,70 @@
             cursor: crosshair;
         }
 
-        .bg-valid-key {
-            background: linear-gradient(to bottom right, #0f172a, #312e81, #0f172a) !important;
-            background-size: 200% 200%;
-            animation: gradientMove 15s ease infinite;
+        /* --- GLITTER EFFECT --- */
+        #glitter-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 1.5s ease-in-out;
+            background-image: 
+                radial-gradient(white, rgba(255,255,255,.2) 2px, transparent 3px),
+                radial-gradient(white, rgba(255,255,255,.15) 1px, transparent 2px),
+                radial-gradient(white, rgba(255,255,255,.1) 2px, transparent 3px);
+            background-size: 550px 550px, 350px 350px, 250px 250px;
+            background-position: 0 0, 40px 60px, 130px 270px;
         }
 
-        @keyframes gradientMove {
+        .bg-valid-key #glitter-overlay,
+        .bg-gemini-3 #glitter-overlay {
+            opacity: 0.6; /* Subtle visibility */
+            animation: glitterMove 60s linear infinite;
+        }
+
+        /* Standard 2.5 Gradient (Blue/Indigo) */
+        .bg-valid-key {
+            background: linear-gradient(to bottom right, #0f172a, #1e1b4b, #0f172a);
+            background-size: 200% 200%;
+            animation: baseGradientMove 20s ease infinite;
+        }
+
+        /* Gemini 3.0 Gradient (Yellow/Red - Magma) */
+        .bg-gemini-3 {
+            background: linear-gradient(to bottom right, #2a0a0a, #9a3412, #451a03) !important;
+            background-size: 200% 200%;
+            animation: baseGradientMove 20s ease infinite;
+        }
+
+        @keyframes glitterMove {
+            0% { background-position: 0 0, 40px 60px, 130px 270px; }
+            100% { background-position: 550px 550px, 390px 410px, 380px 520px; }
+        }
+
+        @keyframes baseGradientMove {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
+        
+        /* Fade In Animation */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <!-- Glitter Container -->
+    <div id="glitter-overlay"></div>
 
     <!-- ==================== SETTINGS MODAL ==================== -->
     <div id="settings-modal" class="hidden fixed inset-0 bg-slate-950/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -108,9 +161,24 @@
                     </button>
                 </div>
 
+                <!-- Model Selection -->
+                <div class="mb-4">
+                    <label class="block text-xs font-mono text-slate-500 mb-2 uppercase">Core Model</label>
+                    <div class="relative">
+                        <select id="settings-model" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all font-mono text-sm appearance-none cursor-pointer hover:bg-slate-700" onchange="updateBackground()">
+                            <option value="gemini-2.5-flash-image-preview">Gemini 2.5 Flash (Nano Banana)</option>
+                            <option value="gemini-3.0-flash-image-preview-09-2025">Gemini 3.0 Pro (Nano Banana Pro)</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1 italic">* 3.0 requires explicit allowlist access.</p>
+                </div>
+
                 <div class="flex gap-3 mb-4">
                     <button onclick="submitSettingsApiKey()" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 rounded-lg transition-colors text-sm">
-                        Save Key
+                        Save Config
                     </button>
                     <button onclick="clearSettingsApiKey()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold px-4 py-2 rounded-lg transition-colors text-sm">
                         Clear
@@ -224,6 +292,16 @@
                         <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider"><i class="fa-solid fa-image mr-2"></i>Stage & Scenery</h3>
                     </div>
 
+                    <!-- BACKGROUND PRESETS -->
+                    <div class="mb-4">
+                        <div class="flex items-center gap-2 mb-2">
+                             <span class="text-xs text-slate-500 font-mono uppercase">Quick Select</span>
+                        </div>
+                        <div class="grid grid-cols-5 gap-2" id="bg-presets-grid">
+                            <!-- Presets Injected Here -->
+                        </div>
+                    </div>
+
                     <div id="bg-upload-container">
                         <!-- Placeholder State -->
                         <label id="bg-upload-label" class="w-full aspect-video bg-slate-700/50 hover:bg-slate-700 border-2 border-dashed border-slate-600 hover:border-slate-400 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all group p-4">
@@ -237,6 +315,11 @@
                             <div class="relative w-full aspect-video">
                                 <img id="bg-preview-img" class="w-full h-full object-cover rounded-lg border border-slate-600 shadow-sm">
                                 <button onclick="removeBackground()" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 z-10"><i class="fa-solid fa-times"></i></button>
+                                
+                                <!-- Loading overlay for presets -->
+                                <div id="bg-loading-overlay" class="hidden absolute inset-0 bg-slate-900/80 flex items-center justify-center z-20">
+                                    <i class="fa-solid fa-circle-notch fa-spin text-yellow-400"></i>
+                                </div>
                             </div>
                             <input type="text" id="bg-desc-input" onchange="updateBackgroundDesc(this.value)" placeholder="Describe location (e.g., 'Cyberpunk Bar')" class="w-full mt-2 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs text-white focus:border-blue-400 outline-none placeholder-slate-600">
                         </div>
@@ -390,6 +473,15 @@
         // ================= CONFIGURATION =================
         const DAILY_PASSWORD = "LSC";
 
+        // Persistent Backgrounds
+        const PRESET_BACKGROUNDS = [
+            { id: "cozy-bar", label: "Cozy Bar", url: "https://raw.githubusercontent.com/SalamancaTech/LSCPhotos/main/barback01.jpg" },
+            { id: "digital-bar", label: "Digital Bar", url: "https://raw.githubusercontent.com/SalamancaTech/LSCPhotos/main/SSS-digital.png" },
+            { id: "cozy-front", label: "Cozy Front", url: "https://raw.githubusercontent.com/SalamancaTech/LSCPhotos/main/cozyfront.jpg" },
+            { id: "karaoke", label: "Karaoke", url: "https://raw.githubusercontent.com/SalamancaTech/LSCPhotos/main/karaoke.jpg" },
+            { id: "glitter-back", label: "Glitter Back", url: "https://raw.githubusercontent.com/SalamancaTech/LSCPhotos/main/glitterback01.jpg" }
+        ];
+
         // System State
         let uploadedImages = []; // { id, base64, description }
         let uploadedBackground = null; // { base64, description }
@@ -398,6 +490,7 @@
         let userApiKey = "";
         let currentMode = "composition";
         let isDrawing = false;
+        let currentModelId = "gemini-2.5-flash-image-preview"; // Default Model
         let ctx = null;
         let lastX = 0;
         let lastY = 0;
@@ -507,6 +600,67 @@
             renderGrid(BOOTH_MOODS, 'booth-mood-grid', 'photobooth', 'mood', true);
             renderGrid(COMIC_LAYOUTS, 'comic-layout-grid', 'comic', 'layout');
             renderGrid(COMIC_STYLES, 'comic-style-grid', 'comic', 'style');
+            
+            // New Presets
+            renderBackgroundPresets();
+        }
+
+        function renderBackgroundPresets() {
+            const container = document.getElementById('bg-presets-grid');
+            container.innerHTML = '';
+            PRESET_BACKGROUNDS.forEach(preset => {
+                const btn = document.createElement('button');
+                btn.className = "w-full aspect-square bg-slate-800 rounded-lg border border-slate-600 hover:border-white overflow-hidden relative group transition-all";
+                btn.innerHTML = `
+                    <img src="${preset.url}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300">
+                    <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <span class="text-[9px] font-bold text-white uppercase text-center leading-tight px-1">${preset.label}</span>
+                    </div>
+                `;
+                btn.onclick = () => loadPresetBackground(preset.url, preset.label);
+                container.appendChild(btn);
+            });
+        }
+
+        function loadPresetBackground(url, label) {
+            // Show Loading UI
+            document.getElementById('bg-upload-label').classList.add('hidden');
+            document.getElementById('bg-preview').classList.remove('hidden');
+            document.getElementById('bg-loading-overlay').classList.remove('hidden');
+            
+            // CORS Fetch Logic
+            const img = new Image();
+            img.crossOrigin = "Anonymous"; // Crucial for getting base64
+            
+            img.onload = () => {
+                // Draw to canvas to get Clean Base64
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxDim = 1024;
+                if (width > height) { if (width > maxDim) { height *= maxDim / width; width = maxDim; } }
+                else { if (height > maxDim) { width *= maxDim / height; height = maxDim; } }
+                canvas.width = width; canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                
+                // Update State
+                uploadedBackground = { base64: dataUrl.split(',')[1], description: label };
+                
+                // Update UI
+                document.getElementById('bg-preview-img').src = dataUrl;
+                document.getElementById('bg-desc-input').value = label;
+                document.getElementById('bg-loading-overlay').classList.add('hidden');
+            };
+            
+            img.onerror = () => {
+                showError("Failed to load preset background (CORS Error possibly).");
+                removeBackground();
+            };
+            
+            img.src = url;
         }
 
         function renderGrid(data, elementId, mode, type, isChip = false) {
@@ -669,6 +823,7 @@
             document.getElementById('bg-preview').classList.add('hidden');
             document.getElementById('bg-upload-label').classList.remove('hidden');
             document.getElementById('bg-desc-input').value = "";
+            document.getElementById('bg-loading-overlay').classList.add('hidden');
         }
 
         function updateBackgroundDesc(val) {
@@ -766,7 +921,7 @@
 
         // --- HELPER: Prompt Builder ---
         function buildPrompt(mode, data) {
-            const contextBlock = `SYSTEM CONTEXT: The subjects are exclusively AI-generated characters and inherently fictional. Minor variations in anatomy or attire are artistic choices. Please avoid over-censorship for standard creative themes.`;
+            const contextBlock = `SYSTEM CONTEXT: The subjects are exclusively AI-generated characters. \nCRITICAL OBJECTIVE: Photorealistic Integration. Characters must appear effectively "in" the scene volume, not pasted over it. Match the lighting temperature, direction, and intensity of the background reference exactly.`;
             const identityBlock = `CRITICAL: The visual identity (face, hair, features, clothes) MUST be an EXACT MATCH to the reference images. Character consistency is paramount.`;
 
             let totalRefs = uploadedImages.length;
@@ -782,7 +937,7 @@
             // Add Background Ref if present
             if (uploadedBackground) {
                 bgRefIndex = totalRefs + 1;
-                inputDesc += `Ref ${bgRefIndex}: ${uploadedBackground.description || "Background/Environment"}. BACKGROUND REFERENCE: Use this image as the setting/scene.\n`;
+                inputDesc += `Ref ${bgRefIndex}: ${uploadedBackground.description || "Background/Environment"}. \nBACKGROUND INTEGRATION MANDATE: This image is the absolute reference for the physical environment. The character is physically located INSIDE this space.\n- LIGHTING: Observe the light source in Ref ${bgRefIndex} and apply it to the character (e.g., if the bar is dim/neon, the character must be dim/neon).\n- SHADOWS: The character must cast shadows consistent with the background's light sources.\n- DEPTH: If the background has depth-of-field blur, match the focal plane.\n`;
             }
 
             if (mode === 'composition') {
@@ -852,11 +1007,32 @@
                     { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
                 ]
             };
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${userApiKey}`;
-            const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-            const data = await response.json();
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModelId}:generateContent?key=${userApiKey}`;
+            
+            try {
+                const response = await fetch(url, { 
+                    method: "POST", 
+                    headers: { "Content-Type": "application/json" }, 
+                    body: JSON.stringify(payload) 
+                });
 
-            return handleGeminiResponse(data);
+                // Get text first to avoid "Unexpected end of input"
+                const responseText = await response.text();
+                if (!responseText) {
+                    throw new Error("Empty response from API. Please check your key/connection.");
+                }
+
+                const data = JSON.parse(responseText);
+
+                if (!response.ok) {
+                    throw new Error(data.error?.message || `API Error: ${response.status}`);
+                }
+                
+                return handleGeminiResponse(data);
+            } catch (e) {
+                console.error("Gemini Fetch Error:", e);
+                throw e;
+            }
         }
 
         // --- HELPER: Image Stitching ---
@@ -922,8 +1098,6 @@
         }
 
         // ================= UTILS =================
-        // ... (Existing Auth, Error, Gallery, Edit functions kept exactly as is) ...
-
         function addToGallery(base64, prompt) {
             const id = Date.now().toString();
             const timestamp = new Date().toLocaleTimeString();
@@ -998,7 +1172,7 @@
              try {
                 const parts = [{ text: `EDIT REQUEST: ${prompt}` }, { inlineData: { mimeType: "image/jpeg", data: base64Input } }];
                 const payload = { contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE"] } };
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${userApiKey}`;
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModelId}:generateContent?key=${userApiKey}`;
                 const data = await fetchWithBackoff(url, payload); // Use fetchWithBackoff for edits
                 const base64 = handleGeminiResponse(data);
                 document.getElementById('loading-state').classList.add('hidden');
@@ -1006,93 +1180,24 @@
             } catch(e) { showError(e.message); document.getElementById('loading-state').classList.add('hidden'); document.getElementById('view-mode').classList.remove('hidden'); }
         }
 
-        // Rest of Utils
-        function attemptLogin() {
-            const passInput = document.getElementById('password-input').value;
-            const keyInput = document.getElementById('apikey-input').value;
-            if (passInput === DAILY_PASSWORD) {
-                userApiKey = keyInput.trim();
-                document.getElementById('login-overlay').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('login-overlay').classList.add('hidden');
-                    document.getElementById('app-container').classList.remove('hidden-app');
-                    initControls();
-                }, 500);
-            } else {
-                const box = document.querySelector('#login-overlay > div');
-                box.classList.add('animate-pulse');
-                setTimeout(() => box.classList.remove('animate-pulse'), 500);
-                document.getElementById('login-error').classList.remove('hidden');
-            }
-        }
-        document.getElementById('password-input').addEventListener('keypress', (e) => { if(e.key==='Enter') attemptLogin() });
-
-        function showError(msg) {
-            document.getElementById('error-msg').innerText = msg;
-            document.getElementById('error-state').classList.remove('hidden');
-            document.getElementById('loading-state').classList.add('hidden');
-        }
-        function hideError() { document.getElementById('error-state').classList.add('hidden'); }
-        function downloadImage() {
-            const img = document.getElementById('final-image');
-            if (!img.src) return;
-            const a = document.createElement('a');
-            a.href = img.src;
-            a.download = `nano-booth-${Date.now()}.png`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
-        function resetApp() {
-            uploadedImages = [];
-            state = { composition: { scene: "", mood: "" }, photobooth: { format: "", mood: "" }, comic: { style: "", layout: "" } };
-            document.getElementById('preview-grid').innerHTML = `<label class="aspect-square bg-slate-700/50 hover:bg-slate-700 border-2 border-dashed border-slate-600 hover:border-slate-400 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all group min-h-[140px]"><i class="fa-solid fa-plus text-slate-400 group-hover:text-white mb-2"></i><span class="text-[10px] text-slate-400 uppercase">Add Character</span><input type="file" id="file-upload" multiple accept="image/*" class="hidden" onchange="handleFileUpload(event)"></label>`;
-            document.getElementById('final-image').src = "";
-            document.getElementById('view-mode').classList.add('hidden');
-            document.getElementById('output-placeholder').classList.remove('hidden');
-            document.getElementById('edit-mode').classList.add('hidden');
-            updateCount();
-            initControls();
-            switchMode('composition');
-        }
-
-        // Canvas editing logic
-        function startEditing() {
-            if (!currentImage) return;
-            document.getElementById('view-mode').classList.add('hidden');
-            document.getElementById('edit-mode').classList.remove('hidden');
-            const img = new Image();
-            img.onload = () => {
-                const container = document.getElementById('canvas-container');
-                const canvas = document.getElementById('edit-canvas');
-                const ratio = Math.min(container.clientWidth / img.width, container.clientHeight / img.height);
-                canvas.width = img.width * ratio; canvas.height = img.height * ratio;
-                ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                canvas.onmousedown = startDrawing; canvas.onmousemove = draw; canvas.onmouseup = stopDrawing;
-                // Touch
-                canvas.addEventListener('touchstart', (e) => { const touch = e.touches[0]; const mouseEvent = new MouseEvent('mousedown', { clientX: touch.clientX, clientY: touch.clientY }); canvas.dispatchEvent(mouseEvent); });
-                canvas.addEventListener('touchmove', (e) => { e.preventDefault(); const touch = e.touches[0]; const mouseEvent = new MouseEvent('mousemove', { clientX: touch.clientX, clientY: touch.clientY }); canvas.dispatchEvent(mouseEvent); });
-                canvas.addEventListener('touchend', () => { const mouseEvent = new MouseEvent('mouseup', {}); canvas.dispatchEvent(mouseEvent); });
-            };
-            img.src = `data:image/png;base64,${currentImage.base64}`;
-        }
-        function cancelEditing() { document.getElementById('edit-mode').classList.add('hidden'); document.getElementById('view-mode').classList.remove('hidden'); }
-        function clearCanvas() { if (!currentImage) return; const img = new Image(); img.onload = () => { ctx.clearRect(0,0,ctx.canvas.width, ctx.canvas.height); ctx.drawImage(img, 0, 0, ctx.canvas.width, ctx.canvas.height); }; img.src = `data:image/png;base64,${currentImage.base64}`; }
-        function startDrawing(e) { isDrawing = true; [lastX, lastY] = getCoords(e); }
-        function draw(e) { if(!isDrawing) return; const [x,y]=getCoords(e); ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.strokeStyle='#ef4444'; ctx.lineWidth=5; ctx.stroke(); [lastX, lastY]=[x,y]; }
-        function stopDrawing() { isDrawing = false; }
-        function getCoords(e) { const r = document.getElementById('edit-canvas').getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
-
         // ================= SETTINGS LOGIC =================
         function initSettings() {
+            // Load API Key
             const storedKey = localStorage.getItem('LSC_API_KEY');
             if (storedKey) {
                 userApiKey = storedKey;
                 document.getElementById('settings-apikey').value = storedKey;
-                document.getElementById('apikey-input').value = storedKey; // Pre-fill login input too
-                updateBackground();
+                document.getElementById('apikey-input').value = storedKey; 
             }
+
+            // Load Model Preference
+            const storedModel = localStorage.getItem('LSC_MODEL_ID');
+            if (storedModel) {
+                currentModelId = storedModel;
+                document.getElementById('settings-model').value = storedModel;
+            }
+
+            updateBackground();
         }
 
         function toggleSettingsModal() {
@@ -1116,11 +1221,17 @@
             const key = document.getElementById('settings-apikey').value.trim();
             userApiKey = key;
             const persist = document.getElementById('persist-apikey-toggle').checked;
+            
+            // Get selected model
+            const modelSelect = document.getElementById('settings-model');
+            currentModelId = modelSelect.value;
 
-            if (persist && key) {
-                localStorage.setItem('LSC_API_KEY', key);
+            if (persist) {
+                if (key) localStorage.setItem('LSC_API_KEY', key);
+                localStorage.setItem('LSC_MODEL_ID', currentModelId);
             } else {
                 localStorage.removeItem('LSC_API_KEY');
+                localStorage.removeItem('LSC_MODEL_ID');
             }
 
             updateBackground();
@@ -1131,41 +1242,29 @@
             userApiKey = "";
             document.getElementById('settings-apikey').value = "";
             localStorage.removeItem('LSC_API_KEY');
+            localStorage.removeItem('LSC_MODEL_ID');
+            currentModelId = "gemini-2.5-flash-image-preview"; // Reset to default
+            document.getElementById('settings-model').value = currentModelId;
             updateBackground();
         }
 
         function updateBackground() {
+            // Check if key is present
             if (userApiKey && userApiKey.length > 0) {
-                document.body.classList.add('bg-valid-key');
-            } else {
-                document.body.classList.remove('bg-valid-key');
-            }
-        }
+                // Determine model from dropdown OR current state (sync them)
+                const modelSelect = document.getElementById('settings-model');
+                const selected = modelSelect.value;
+                currentModelId = selected; // Ensure sync
 
-        // Overwrite the existing attemptLogin
-        attemptLogin = function() {
-            const passInput = document.getElementById('password-input').value;
-            const keyInput = document.getElementById('apikey-input').value.trim();
-
-            if (passInput === DAILY_PASSWORD) {
-                if (keyInput) {
-                    userApiKey = keyInput;
-                    document.getElementById('settings-apikey').value = keyInput;
+                if (selected.includes('3.0')) {
+                    document.body.classList.add('bg-gemini-3');
+                    document.body.classList.remove('bg-valid-key');
+                } else {
+                    document.body.classList.add('bg-valid-key');
+                    document.body.classList.remove('bg-gemini-3');
                 }
-
-                updateBackground();
-
-                document.getElementById('login-overlay').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('login-overlay').classList.add('hidden');
-                    document.getElementById('app-container').classList.remove('hidden-app');
-                    initControls();
-                }, 500);
             } else {
-                const box = document.querySelector('#login-overlay > div');
-                box.classList.add('animate-pulse');
-                setTimeout(() => box.classList.remove('animate-pulse'), 500);
-                document.getElementById('login-error').classList.remove('hidden');
+                document.body.classList.remove('bg-valid-key', 'bg-gemini-3');
             }
         }
 
