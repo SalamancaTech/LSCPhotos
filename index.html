@@ -1180,6 +1180,74 @@
             } catch(e) { showError(e.message); document.getElementById('loading-state').classList.add('hidden'); document.getElementById('view-mode').classList.remove('hidden'); }
         }
 
+        // Re-adding general utility functions that were missing
+        function showError(msg) {
+            document.getElementById('error-msg').innerText = msg;
+            document.getElementById('error-state').classList.remove('hidden');
+            document.getElementById('loading-state').classList.add('hidden');
+        }
+        function hideError() { document.getElementById('error-state').classList.add('hidden'); }
+        
+        function downloadImage() {
+            const img = document.getElementById('final-image');
+            if (!img.src) return;
+            const a = document.createElement('a');
+            a.href = img.src;
+            a.download = `nano-booth-${Date.now()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+        
+        function resetApp() {
+            uploadedImages = [];
+            uploadedBackground = null;
+            state = { composition: { scene: "", mood: "" }, photobooth: { format: "", mood: "" }, comic: { style: "", layout: "" } };
+            document.getElementById('preview-grid').innerHTML = `<label class="aspect-square bg-slate-700/50 hover:bg-slate-700 border-2 border-dashed border-slate-600 hover:border-slate-400 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all group min-h-[140px]"><i class="fa-solid fa-plus text-slate-400 group-hover:text-white mb-2"></i><span class="text-[10px] text-slate-400 uppercase">Add Character</span><input type="file" id="file-upload" multiple accept="image/*" class="hidden" onchange="handleFileUpload(event)"></label>`;
+            document.getElementById('final-image').src = "";
+            document.getElementById('view-mode').classList.add('hidden');
+            document.getElementById('output-placeholder').classList.remove('hidden');
+            document.getElementById('edit-mode').classList.add('hidden');
+            removeBackground();
+            updateCount();
+            initControls();
+            switchMode('composition');
+        }
+
+        // Restoring attemptLogin with new settings logic integration
+        function attemptLogin() {
+            const passInput = document.getElementById('password-input').value;
+            const keyInput = document.getElementById('apikey-input').value.trim();
+
+            if (passInput === DAILY_PASSWORD) {
+                if (keyInput) {
+                    userApiKey = keyInput;
+                    document.getElementById('settings-apikey').value = keyInput;
+                } else {
+                    // If no key entered at login, check if settings already has one populated (from initSettings)
+                    const existingKey = document.getElementById('settings-apikey').value;
+                    if(existingKey) {
+                        userApiKey = existingKey;
+                    }
+                }
+
+                updateBackground();
+
+                document.getElementById('login-overlay').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('login-overlay').classList.add('hidden');
+                    document.getElementById('app-container').classList.remove('hidden-app');
+                    initControls();
+                }, 500);
+            } else {
+                const box = document.querySelector('#login-overlay > div');
+                box.classList.add('animate-pulse');
+                setTimeout(() => box.classList.remove('animate-pulse'), 500);
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        }
+        document.getElementById('password-input').addEventListener('keypress', (e) => { if(e.key==='Enter') attemptLogin() });
+
         // ================= SETTINGS LOGIC =================
         function initSettings() {
             // Load API Key
