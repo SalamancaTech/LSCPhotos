@@ -171,8 +171,11 @@
                     </div>
                     <div class="relative">
                         <select id="settings-model" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all font-mono text-sm appearance-none cursor-pointer hover:bg-slate-700" onchange="updateBackground()">
-                            <option value="gemini-2.5-flash-image-preview">gemini-2.5-flash-image-preview (Default)</option>
-                            <option value="gemini-3.0-flash-image-preview-09-2025">gemini-3.0-flash-image-preview-09-2025 (Inferred)</option>
+                            <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp (Newest)</option>
+                            <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                            <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                            <option value="gemini-1.5-flash-8b">gemini-1.5-flash-8b</option>
+                            <option value="gemini-pro-vision">gemini-pro-vision (Legacy)</option>
                         </select>
                         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
                             <i class="fa-solid fa-chevron-down text-xs"></i>
@@ -1270,16 +1273,24 @@
             const storedModel = localStorage.getItem('LSC_MODEL_ID');
             if (storedModel) {
                 currentModelId = storedModel;
-                // Since options are dynamic, we might set value but if option doesn't exist yet it won't show
-                // We'll trust the stored ID for now
+                const select = document.getElementById('settings-model');
+                // Temporarily add the stored option if it's custom and not in the static list
+                let exists = false;
+                for(let i=0; i<select.options.length; i++){
+                    if(select.options[i].value === storedModel) exists = true;
+                }
+                if(!exists){
+                    const opt = document.createElement('option');
+                    opt.value = storedModel;
+                    opt.text = storedModel + " (Saved)";
+                    select.add(opt);
+                }
+                select.value = storedModel;
             } else {
                 // Default
-                currentModelId = "gemini-2.5-flash-image-preview";
+                currentModelId = "gemini-2.0-flash-exp";
+                document.getElementById('settings-model').value = currentModelId;
             }
-            
-            // Try to set value if default options exist
-            const select = document.getElementById('settings-model');
-            if(select) select.value = currentModelId;
 
             updateBackground();
         }
@@ -1327,26 +1338,19 @@
                 selectEl.innerHTML = '';
                 
                 // Filter and Populate
-                // We primarily want models that might support generation. 
-                // Since the list doesn't explicitly flag 'image generation' easily without deep inspection,
-                // we'll filter for 'gemini' and 'imagen' families as a heuristic.
                 const validModels = data.models.filter(m => 
                     (m.name.includes('gemini') || m.name.includes('imagen')) 
                 );
                 
                 if (validModels.length === 0) {
-                     // Fallback if filter is too strict or API changes
-                     const option = document.createElement('option');
-                     option.value = "gemini-2.5-flash-image-preview";
-                     option.text = "gemini-2.5-flash-image-preview (Fallback)";
-                     selectEl.appendChild(option);
+                     // Fallback 
+                     selectEl.innerHTML = `
+                        <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp (Fallback)</option>
+                        <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                     `;
                 } else {
                     validModels.forEach(m => {
                         const option = document.createElement('option');
-                        // API returns "models/gemini-...", strip "models/" for cleaner ID if needed, 
-                        // BUT our URL construction adds the ID directly. 
-                        // The previous code expected NO "models/" prefix in the variable, because it injected into `.../models/${id}...`
-                        // So we strip "models/"
                         const id = m.name.replace('models/', '');
                         option.value = id;
                         option.text = id + (id.includes('preview') || id.includes('exp') ? ' (Preview)' : '');
@@ -1368,14 +1372,16 @@
                 
             } catch (e) {
                 console.error(e);
-                statusEl.innerText = "Error fetching list. Using default defaults.";
+                statusEl.innerText = "Error fetching list. Using robust defaults.";
                 statusEl.classList.remove('text-blue-400');
                 statusEl.classList.add('text-red-400');
                 
-                // Reset to hardcoded defaults on error
+                // Reset to curated defaults on error
                 selectEl.innerHTML = `
-                    <option value="gemini-2.5-flash-image-preview">gemini-2.5-flash-image-preview (Default)</option>
-                    <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp</option>
+                    <option value="gemini-2.0-flash-exp">gemini-2.0-flash-exp (Default)</option>
+                    <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                    <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                    <option value="gemini-1.5-flash-8b">gemini-1.5-flash-8b</option>
                 `;
             }
         }
@@ -1387,7 +1393,7 @@
             
             // Get selected model from SELECT
             const modelSelect = document.getElementById('settings-model');
-            currentModelId = modelSelect.value || "gemini-2.5-flash-image-preview"; // Fallback if empty
+            currentModelId = modelSelect.value || "gemini-2.0-flash-exp"; // Fallback if empty
 
             if (persist) {
                 if (key) localStorage.setItem('LSC_API_KEY', key);
@@ -1406,7 +1412,7 @@
             document.getElementById('settings-apikey').value = "";
             localStorage.removeItem('LSC_API_KEY');
             localStorage.removeItem('LSC_MODEL_ID');
-            currentModelId = "gemini-2.5-flash-image-preview"; // Reset to default
+            currentModelId = "gemini-2.0-flash-exp"; // Reset to default
             document.getElementById('settings-model').value = currentModelId;
             updateBackground();
         }
@@ -1420,7 +1426,8 @@
                 currentModelId = modelSelect.value; // Ensure sync
 
                 // Trigger "Magma" UI for 3.0, Pro, or Experimental models
-                if (selected.includes('3.0') || selected.includes('pro') || selected.includes('exp')) {
+                // Added "2.0" to the trigger list for visual feedback on the new default
+                if (selected.includes('3.0') || selected.includes('pro') || selected.includes('exp') || selected.includes('2.0')) {
                     document.body.classList.add('bg-gemini-3');
                     document.body.classList.remove('bg-valid-key');
                 } else {
