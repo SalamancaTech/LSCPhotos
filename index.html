@@ -249,6 +249,16 @@
                         <span id="image-count" class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">0 loaded</span>
                     </div>
 
+                    <!-- RESIDENT STAFF SELECTOR -->
+                    <div class="mb-4">
+                        <div class="flex items-center gap-2 mb-2">
+                             <span class="text-xs text-slate-500 font-mono uppercase">Resident Staff</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3" id="cast-presets-grid">
+                            <!-- Injected via JS -->
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-4 mb-4" id="preview-grid">
                         <!-- Characters will be injected here with inputs -->
                         <label class="aspect-square bg-slate-700/50 hover:bg-slate-700 border-2 border-dashed border-slate-600 hover:border-slate-400 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all group min-h-[140px]">
@@ -459,15 +469,31 @@
             { id: "glitter-back", label: "Glitter Back", url: "https://raw.githubusercontent.com/SalamancaTech/LSCPhotos/main/glitterback01.jpg" }
         ];
 
+        // Resident Staff
+        const PRESET_CAST = [
+            {
+                id: "zeke",
+                label: "Zeke (Bartender)",
+                url: "https://raw.githubusercontent.com/SalamancaTech/LSCPhotos/main/Zeke.png",
+                instructions: "MANDATE: This is Zeke. He is the bartender. He MUST be placed in the background, behind the bar counter if one exists, or serving drinks. He is a staff member, not the main subject. His expression should be professional or cleaning a glass."
+            },
+            {
+                id: "greg",
+                label: "Greg (The Ghoul)",
+                url: "https://raw.githubusercontent.com/SalamancaTech/LSCPhotos/main/greg01.png",
+                instructions: "MANDATE: This is Greg. He is a horror element. He MUST be placed in deep shadows, a dark corner, or the far background. He is unnerving, unmoving, and hard to spot. He is watching silently. Do not make him the center of attention."
+            }
+        ];
+
         // System State
-        let uploadedImages = []; // { id, base64, description }
+        let uploadedImages = []; // { id, base64, description, isPreset }
         let uploadedBackground = null; // { base64, description }
         let sessionGallery = [];
         let currentImage = null;
         let userApiKey = "";
         let currentMode = "composition";
         let isDrawing = false;
-        let currentModelId = "gemini-2.5-flash-image"; 
+        let currentModelId = "gemini-2.5-flash-image-preview"; 
         let ctx = null;
         let lastX = 0;
         let lastY = 0;
@@ -585,6 +611,7 @@
             
             // New Presets
             renderBackgroundPresets();
+            renderCastPresets();
         }
 
         function renderBackgroundPresets() {
@@ -602,6 +629,91 @@
                 btn.onclick = () => loadPresetBackground(preset.url, preset.label);
                 container.appendChild(btn);
             });
+        }
+
+        function renderCastPresets() {
+            const container = document.getElementById('cast-presets-grid');
+            container.innerHTML = '';
+            PRESET_CAST.forEach(cast => {
+                const btn = document.createElement('button');
+                btn.className = "flex items-center gap-3 p-3 bg-slate-800 rounded-lg border border-slate-600 hover:border-yellow-400 transition-all text-left w-full group";
+                btn.innerHTML = `
+                    <div class="w-10 h-10 rounded-full overflow-hidden border border-slate-500 group-hover:border-white">
+                        <img src="${cast.url}" class="w-full h-full object-cover">
+                    </div>
+                    <div>
+                        <span class="block text-xs font-bold text-white group-hover:text-yellow-400 uppercase">${cast.label}</span>
+                        <span class="block text-[10px] text-slate-400">Add to Scene</span>
+                    </div>
+                `;
+                btn.onclick = () => toggleCastMember(cast);
+                container.appendChild(btn);
+            });
+        }
+
+        function toggleCastMember(castMember) {
+            // Check if already present to avoid duplicates
+            const existing = uploadedImages.find(img => img.id === castMember.id);
+            if (existing) {
+                // If clicked again, maybe remove? Or flash it to show it's there. 
+                // Let's remove for toggle behavior.
+                removeImage(castMember.id, document.querySelector(`button[data-id='${castMember.id}']`)); // Dummy call, button removed in redraw
+                return;
+            }
+
+            // Fetch image
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width; 
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                const dataUrl = canvas.toDataURL('image/png'); // PNG for transparency
+                
+                // Add to state with LOCKED description
+                uploadedImages.push({
+                    id: castMember.id,
+                    base64: dataUrl.split(',')[1],
+                    description: castMember.instructions,
+                    isPreset: true,
+                    displayUrl: castMember.url
+                });
+                
+                updatePreviewGrid();
+                updateCount();
+            };
+            img.src = castMember.url;
+        }
+
+        function updatePreviewGrid() {
+            const grid = document.getElementById('preview-grid');
+            // Keep the upload button
+            const uploadBtn = grid.querySelector('label');
+            grid.innerHTML = ''; // Clear
+            
+            uploadedImages.forEach(img => {
+                const div = document.createElement('div');
+                div.className = "relative group animate-fade-in flex flex-col gap-2";
+                
+                // Logic to handle preset locking
+                const descInput = img.isPreset 
+                    ? `<div class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[10px] text-slate-400 italic truncate" title="${img.description}"><i class="fa-solid fa-lock mr-1"></i>${img.id.toUpperCase()} (Staff)</div>`
+                    : `<input type="text" onchange="updateImageDesc('${img.id}', this.value)" placeholder="Name/Tag" value="${img.description || ''}" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-yellow-400 outline-none placeholder-slate-600">`;
+
+                const imgSrc = img.displayUrl ? img.displayUrl : `data:image/jpeg;base64,${img.base64}`;
+
+                div.innerHTML = `
+                    <div class="relative aspect-square w-full">
+                        <img src="${imgSrc}" class="w-full h-full object-cover rounded-lg border border-slate-600 shadow-sm ${img.isPreset ? 'grayscale-0' : ''}">
+                        <button onclick="removeImage('${img.id}')" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 z-10"><i class="fa-solid fa-times"></i></button>
+                    </div>
+                    ${descInput}
+                `;
+                grid.appendChild(div);
+            });
+            grid.appendChild(uploadBtn);
         }
 
         function loadPresetBackground(url, label) {
@@ -746,25 +858,19 @@
 
         function addImageToState(displayUrl, rawBase64) {
             const id = Date.now() + Math.random().toString(36).substr(2, 9);
-            uploadedImages.push({ id, base64: rawBase64, description: "" });
-            const grid = document.getElementById('preview-grid');
-            const div = document.createElement('div');
-            div.className = "relative group animate-fade-in flex flex-col gap-2";
-            div.innerHTML = `
-                <div class="relative aspect-square w-full">
-                    <img src="${displayUrl}" class="w-full h-full object-cover rounded-lg border border-slate-600 shadow-sm">
-                    <button onclick="removeImage('${id}', this)" class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600 z-10"><i class="fa-solid fa-times"></i></button>
-                </div>
-                <input type="text" onchange="updateImageDesc('${id}', this.value)" placeholder="Name/Tag" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-yellow-400 outline-none placeholder-slate-600">
-            `;
-            const uploadBtn = grid.querySelector('label');
-            if(uploadBtn) grid.insertBefore(div, uploadBtn);
-            else grid.appendChild(div);
+            uploadedImages.push({ id, base64: rawBase64, description: "", displayUrl: displayUrl }); 
+            updatePreviewGrid();
             updateCount();
         }
 
         function updateImageDesc(id, val) { const img = uploadedImages.find(i => i.id === id); if(img) img.description = val; }
-        function removeImage(id, btn) { uploadedImages = uploadedImages.filter(img => img.id !== id); btn.parentElement.parentElement.remove(); updateCount(); }
+        
+        function removeImage(id) { 
+            uploadedImages = uploadedImages.filter(img => img.id !== id); 
+            updatePreviewGrid();
+            updateCount(); 
+        }
+        
         function updateCount() { document.getElementById('image-count').innerText = `${uploadedImages.length} loaded`; }
 
         // --- BACKGROUND HANDLING ---
@@ -980,23 +1086,24 @@
         }
 
         const MODEL_CASCADE = [
-            "gemini-3-pro-image-preview", // 1. User Requested Target (Aspirational)
-            "gemini-2.5-flash-image",     // 2. Primary Fallback (New Default)
-            "gemini-2.0-flash-exp",       // 3. Experimental
-            "imagen-3.0-generate-001"     // 4. Imagen Backup
+            "gemini-2.5-flash-preview",       // 1. User Request (Primary)
+            "gemini-2.5-flash-image-preview", // 2. Image Variant
+            "gemini-2.0-flash-exp",           // 3. Bleeding Edge / Experimental
+            "gemini-1.5-pro",                 // 4. Stable Pro
+            "gemini-1.5-flash",               // 5. Stable Flash
+            "imagen-3.0-generate-001",        // 6. Dedicated Imagen (Backup)
+            "imagen-4.0-generate-001"         // 7. Last Resort
         ];
 
         // --- HELPER: API Call ---
         async function callGemini(promptText, modelIndex = 0) {
             if (modelIndex >= MODEL_CASCADE.length) {
-                // If we run out of models, show the last error encountered or a generic failure
                 throw new Error(`All models in cascade failed. Last attempt: ${MODEL_CASCADE[modelIndex-1]}`);
             }
 
             const activeModelId = MODEL_CASCADE[modelIndex];
             console.log(`[Cascade Step ${modelIndex + 1}/${MODEL_CASCADE.length}] Attempting generation with model: ${activeModelId}`);
 
-            // Update UI to show which brain we are currently trying (optional but helpful)
             const loadingStep = document.getElementById('loading-step');
             if(loadingStep) loadingStep.innerText = `Contacting ${activeModelId}...`;
 
@@ -1013,9 +1120,6 @@
                 // Gemini Structure
                 const parts = [{ text: promptText }];
                 
-                // Add images only if model is likely multimodal
-                // We send them to all Gemini models; if the specific model is text-only, it might fail 
-                // and trigger the next step in the cascade, which is intended behavior.
                 uploadedImages.forEach(img => parts.push({ inlineData: { mimeType: "image/jpeg", data: img.base64 } }));
                 if (uploadedBackground) {
                     parts.push({ inlineData: { mimeType: "image/jpeg", data: uploadedBackground.base64 } });
@@ -1023,8 +1127,8 @@
 
                 payload = {
                     contents: [{ parts }],
-                    // responseModalities is risky on mixed model types, letting the API infer output is safer
-                    // generationConfig: { responseModalities: ["IMAGE"] }, 
+                    // IMPORTANT: Set correct modalities for 2.5-image models
+                    generationConfig: { responseModalities: ["TEXT", "IMAGE"] }, 
                     safetySettings: [
                         { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
                         { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
@@ -1047,7 +1151,6 @@
                     throw new Error("Empty response from API.");
                 }
 
-                // Try to parse, if fails, it's a critical network/format error
                 let data;
                 try {
                     data = JSON.parse(responseText);
@@ -1057,15 +1160,10 @@
 
                 if (!response.ok) {
                     const errMsg = data.error?.message || JSON.stringify(data.error) || `Status ${response.status}`;
-                    
-                    // Broad error catching for failover
-                    // We assume ANY error from the API on a specific model means "Try the next one"
-                    // to ensure maximum uptime.
                     console.warn(`[Cascade] ${activeModelId} failed: ${errMsg}`);
                     return callGemini(promptText, modelIndex + 1); 
                 }
                 
-                // Success! Update current model for future calls to avoid latency (optimization)
                 if (currentModelId !== activeModelId) {
                     console.log(`[System] Optimization: Switched default model to ${activeModelId}`);
                     currentModelId = activeModelId; 
@@ -1074,7 +1172,6 @@
                 return handleGeminiResponse(data, isImagen);
 
             } catch (e) {
-                // Network errors or unexpected exceptions also trigger failover
                 console.warn(`[Cascade] Exception on ${activeModelId}:`, e);
                 if (modelIndex < MODEL_CASCADE.length - 1) {
                      return callGemini(promptText, modelIndex + 1);
@@ -1095,7 +1192,6 @@
                     return img;
                 });
 
-                // Wait for all to load
                 let loaded = 0;
                 images.forEach(img => {
                     img.onload = () => {
@@ -1108,23 +1204,20 @@
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
 
-                    // Assume all images are roughly same size (from same model)
                     const baseW = images[0].width;
                     const baseH = images[0].height;
                     const padding = 20;
 
                     if (type === 'strip') {
-                        // Vertical Strip
                         canvas.width = baseW + (padding * 2);
                         canvas.height = (baseH * count) + (padding * (count + 1));
-                        ctx.fillStyle = '#ffffff'; // White paper background
+                        ctx.fillStyle = '#ffffff'; 
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
                         images.forEach((img, i) => {
                             ctx.drawImage(img, padding, padding + (i * (baseH + padding)), baseW, baseH);
                         });
                     } else if (type === 'grid') {
-                        // 2xGrid
                         const cols = 2;
                         const rows = Math.ceil(count / 2);
                         canvas.width = (baseW * cols) + (padding * 3);
@@ -1187,7 +1280,6 @@
             document.getElementById('edit-mode').classList.add('hidden');
         }
 
-        // Re-adding fetchWithBackoff for edits if needed, although generic flow uses callGemini
         async function fetchWithBackoff(url, payload, retries = 3) {
              const delays = [1000, 2000, 4000];
             for (let i = 0; i <= retries; i++) {
@@ -1208,7 +1300,6 @@
             }
         }
 
-        // Edit logic needs re-implementation since we moved generic generation to 'callGemini'
         async function submitEdit() {
             const prompt = document.getElementById('edit-prompt').value;
             if(!prompt) { showError("Enter instructions."); return; }
@@ -1219,7 +1310,6 @@
             document.getElementById('loading-text').innerText = "APPLYING CORRECTIONS...";
 
              try {
-                // Force Image-to-Image friendly model for edits if current cascade settled on Imagen (which is bad at img2img)
                 let editModel = currentModelId;
                 if(editModel.includes('imagen')) editModel = "gemini-2.0-flash-exp";
 
@@ -1227,14 +1317,13 @@
                 const payload = { contents: [{ parts }], generationConfig: { responseModalities: ["IMAGE"] } };
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/${editModel}:generateContent?key=${userApiKey}`;
                 
-                const data = await fetchWithBackoff(url, payload); // Use fetchWithBackoff for edits
+                const data = await fetchWithBackoff(url, payload); 
                 const base64 = handleGeminiResponse(data);
                 document.getElementById('loading-state').classList.add('hidden');
                 addToGallery(base64, `Edit: ${prompt}`);
             } catch(e) { showError(e.message); document.getElementById('loading-state').classList.add('hidden'); document.getElementById('view-mode').classList.remove('hidden'); }
         }
 
-        // Re-adding general utility functions that were missing
         function showError(msg) {
             document.getElementById('error-msg').innerText = msg;
             document.getElementById('error-state').classList.remove('hidden');
@@ -1268,7 +1357,6 @@
             switchMode('composition');
         }
 
-        // Restoring attemptLogin with new settings logic integration
         function attemptLogin() {
             const passInput = document.getElementById('password-input').value;
             const keyInput = document.getElementById('apikey-input').value.trim();
@@ -1278,7 +1366,6 @@
                     userApiKey = keyInput;
                     document.getElementById('settings-apikey').value = keyInput;
                 } else {
-                    // If no key entered at login, check if settings already has one populated (from initSettings)
                     const existingKey = document.getElementById('settings-apikey').value;
                     if(existingKey) {
                         userApiKey = existingKey;
@@ -1304,23 +1391,13 @@
 
         // ================= SETTINGS LOGIC =================
         function initSettings() {
-            // Load API Key
             const storedKey = localStorage.getItem('LSC_API_KEY');
             if (storedKey) {
                 userApiKey = storedKey;
                 document.getElementById('settings-apikey').value = storedKey;
                 document.getElementById('apikey-input').value = storedKey; 
             }
-
-            // Load Model Preference - Deprecated for auto-cascade, but kept for legacy clean up
-            const storedModel = localStorage.getItem('LSC_MODEL_ID');
-            if (storedModel) {
-                // currentModelId = storedModel; 
-            } else {
-                // Default
-                currentModelId = "gemini-2.5-flash-image"; // Sync with cascade functional default
-            }
-
+            currentModelId = "gemini-2.5-flash-preview"; 
             updateBackground();
         }
 
@@ -1346,9 +1423,6 @@
             userApiKey = key;
             const persist = document.getElementById('persist-apikey-toggle').checked;
             
-            // Hardcoded model to sync with cascade
-            currentModelId = "gemini-2.5-flash-image";
-
             if (persist) {
                 if (key) localStorage.setItem('LSC_API_KEY', key);
             } else {
@@ -1363,13 +1437,10 @@
             userApiKey = "";
             document.getElementById('settings-apikey').value = "";
             localStorage.removeItem('LSC_API_KEY');
-            // localStorage.removeItem('LSC_MODEL_ID'); // DEPRECATED
-            currentModelId = "gemini-2.5-flash-image"; // Reset to default
             updateBackground();
         }
 
         function updateBackground() {
-            // Check if key is present
             if (userApiKey && userApiKey.length > 0) {
                document.body.classList.add('bg-valid-key');
             } else {
